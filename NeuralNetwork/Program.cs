@@ -17,17 +17,20 @@ class Program
 
         // Архитектура CNN (похожая на LeNet)
         // Вход: 28x28x1
-        network.AddLayer(new ConvolutionalLayer(filterCount: 6, filterSize: 5, stride: 1, inputDepth: 1)); // Выход: 24x24x6
+        network.AddLayer(new ConvolutionalLayer(filterCount: 6, filterSize: 5, stride: 1, inputDepth: 1,
+            paddingType: ConvolutionalLayer.PaddingType.Same)); // Выход: 24x24x6
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
         network.AddLayer(new MaxPoolingLayer(poolSize: 2, stride: 2)); // Выход: 12x12x6
 
-        network.AddLayer(new ConvolutionalLayer(filterCount: 16, filterSize: 5, stride: 1, inputDepth: 6)); // Выход: 8x8x16
+        network.AddLayer(new ConvolutionalLayer(filterCount: 16, filterSize: 5, stride: 1, inputDepth: 6,
+            paddingType: ConvolutionalLayer.PaddingType.Same)); // Выход: 8x8x16
+
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
         network.AddLayer(new MaxPoolingLayer(poolSize: 2, stride: 2)); // Выход: 4x4x16
 
         network.AddLayer(new FlattenLayer()); // Выход: Matrix (256x1)
 
-        network.AddLayer(new LinearLayer(inputSize: 4 * 4 * 16, outputSize: 120));
+        network.AddLayer(new LinearLayer(inputSize: 7 * 7 * 16, outputSize: 120));
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
 
         network.AddLayer(new LinearLayer(inputSize: 120, outputSize: 84));

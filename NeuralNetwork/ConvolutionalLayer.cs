@@ -1,12 +1,31 @@
-﻿namespace NeuralNetwork;
-// ConvolutionalLayer.cs
+﻿using System.Runtime.InteropServices;
 
-public class ConvolutionalLayer : ILayer
+namespace NeuralNetwork;
+
+// Необходимые using'и для Tensor и Matrix
+// using ...
+
+public sealed unsafe class ConvolutionalLayer : ILayer
 {
+    public enum PaddingType
+    {
+        /// <summary>
+        /// Без паддинга. Размер выхода будет меньше входа.
+        /// </summary>
+        Valid,
+        /// <summary>
+        /// Паддинг для сохранения размеров входа при stride=1.
+        /// </summary>
+        Same
+    }
+
     private readonly int _filterCount;
     private readonly int _filterSize;
     private readonly int _stride;
+    private readonly PaddingType _paddingType;
+    private readonly int _padding; // Рассчитанное значение паддинга
 
+    // Используем наши высокопроизводительные классы
     public List<Tensor> Filters { get; private set; }
     public float[] Biases { get; private set; }
 
@@ -14,11 +33,28 @@ public class ConvolutionalLayer : ILayer
     private float[] _biasGradients;
     private Tensor _lastInput;
 
-    public ConvolutionalLayer(int filterCount, int filterSize, int stride, int inputDepth)
+    public ConvolutionalLayer(int filterCount, int filterSize, int stride, int inputDepth, PaddingType paddingType)
     {
         _filterCount = filterCount;
         _filterSize = filterSize;
         _stride = stride;
+        _paddingType = paddingType;
+
+        // Рассчитываем паддинг
+        if (_paddingType == PaddingType.Same)
+        {
+            // Формула для 'same' паддинга: P = (F - 1) / 2
+            // Это работает корректно для нечетных размеров фильтра (3, 5, 7...)
+            if (filterSize % 2 == 0)
+            {
+                Console.WriteLine("Warning: 'Same' padding with an even filter size may not perfectly preserve dimensions.");
+            }
+            _padding = (filterSize - 1) / 2;
+        }
+        else // Valid
+        {
+            _padding = 0;
+        }
 
         Filters = new List<Tensor>();
         Biases = new float[filterCount];
@@ -27,10 +63,9 @@ public class ConvolutionalLayer : ILayer
         for (int i = 0; i < filterCount; i++)
         {
             var filter = new Tensor(filterSize, filterSize, inputDepth);
-            // Инициализация Ксавье/Глорота
-            filter.Randomize(filterSize * filterSize * inputDepth);
+            filter.Randomize(fanIn: filterSize * filterSize * inputDepth);
             Filters.Add(filter);
-            Biases[i] = (rand.NextSingle() * 2 - 1) * MathF.Sqrt(1.0f / (filterSize * filterSize * inputDepth));
+            Biases[i] = 0; // Инициализация смещений нулями - частая практика
         }
     }
 
@@ -38,28 +73,47 @@ public class ConvolutionalLayer : ILayer
     {
         _lastInput = (Tensor)input;
 
-        int outputWidth = (_lastInput.Width - _filterSize) / _stride + 1;
-        int outputHeight = (_lastInput.Height - _filterSize) / _stride + 1;
+        // Формула выхода с учетом паддинга: W_out = (W_in - F + 2P) / S + 1
+        int outputHeight = (_lastInput.Height - _filterSize + 2 * _padding) / _stride + 1;
+        int outputWidth = (_lastInput.Width - _filterSize + 2 * _padding) / _stride + 1;
+
         var output = new Tensor(outputWidth, outputHeight, _filterCount);
+
+        // Обнуляем выходной тензор
+        NativeMemory.Clear(output._data, (nuint)(output.Size * sizeof(float)));
 
         for (int f = 0; f < _filterCount; f++) // Для каждого фильтра
         {
-            for (int y = 0; y < outputHeight; y++)
+            float* filterData = Filters[f]._data;
+            for (int y_out = 0; y_out < outputHeight; y_out++)
             {
-                for (int x = 0; x < outputWidth; x++)
+                for (int x_out = 0; x_out < outputWidth; x_out++)
                 {
-                    // Выполняем свертку
                     float sum = 0;
-                    for (int d = 0; d < _lastInput.Depth; d++)
-                        for (int fy = 0; fy < _filterSize; fy++)
-                            for (int fx = 0; fx < _filterSize; fx++)
-                            {
-                                int inputY = y * _stride + fy;
-                                int inputX = x * _stride + fx;
-                                sum += _lastInput[inputX, inputY, d] * Filters[f][fx, fy, d];
-                            }
+                    // Итерация по окну свертки
+                    for (int fy = 0; fy < _filterSize; fy++)
+                    {
+                        for (int fx = 0; fx < _filterSize; fx++)
+                        {
+                            // Рассчитываем координаты в исходном тензоре
+                            int inputY = y_out * _stride + fy - _padding;
+                            int inputX = x_out * _stride + fx - _padding;
 
-                    output[x, y, f] = sum + Biases[f];
+                            // Логический паддинг: проверяем, находимся ли мы в границах исходного изображения
+                            if (inputY >= 0 && inputY < _lastInput.Height && inputX >= 0 && inputX < _lastInput.Width)
+                            {
+                                // Итерация по глубине (каналам)
+                                for (int d = 0; d < _lastInput.Depth; d++)
+                                {
+                                    float inputValue = _lastInput[inputX, inputY, d];
+                                    float filterValue = filterData[(fy * _filterSize + fx) * _lastInput.Depth + d];
+                                    sum += inputValue * filterValue;
+                                }
+                            }
+                            // Если мы за границами, ничего не добавляем (эквивалентно умножению на 0)
+                        }
+                    }
+                    output[x_out, y_out, f] = sum + Biases[f];
                 }
             }
         }
@@ -71,31 +125,49 @@ public class ConvolutionalLayer : ILayer
         var outputGradient = (Tensor)outputGradientObj;
         var inputGradient = new Tensor(_lastInput.Width, _lastInput.Height, _lastInput.Depth);
 
+        // Обнуляем градиенты перед накоплением
+        NativeMemory.Clear(inputGradient._data, (nuint)(inputGradient.Size * sizeof(float)));
+
         _filterGradients = new List<Tensor>();
         for (int i = 0; i < _filterCount; i++)
-            _filterGradients.Add(new Tensor(_filterSize, _filterSize, _lastInput.Depth));
+        {
+            var gradTensor = new Tensor(_filterSize, _filterSize, _lastInput.Depth);
+            NativeMemory.Clear(gradTensor._data, (nuint)gradTensor.Size * sizeof(float));
+            _filterGradients.Add(gradTensor);
+        }
         _biasGradients = new float[_filterCount];
 
         for (int f = 0; f < _filterCount; f++)
         {
-            for (int y = 0; y < outputGradient.Height; y++)
+            float* filterData = Filters[f]._data;
+            float* filterGradData = _filterGradients[f]._data;
+
+            for (int y_out = 0; y_out < outputGradient.Height; y_out++)
             {
-                for (int x = 0; x < outputGradient.Width; x++)
+                for (int x_out = 0; x_out < outputGradient.Width; x_out++)
                 {
-                    float grad = outputGradient[x, y, f];
-
-                    // Обновляем градиенты для фильтров и смещений
-                    for (int d = 0; d < _lastInput.Depth; d++)
-                        for (int fy = 0; fy < _filterSize; fy++)
-                            for (int fx = 0; fx < _filterSize; fx++)
-                            {
-                                int inputY = y * _stride + fy;
-                                int inputX = x * _stride + fx;
-                                _filterGradients[f][fx, fy, d] += _lastInput[inputX, inputY, d] * grad;
-                                inputGradient[inputX, inputY, d] += Filters[f][fx, fy, d] * grad;
-                            }
-
+                    float grad = outputGradient[x_out, y_out, f];
                     _biasGradients[f] += grad;
+
+                    for (int fy = 0; fy < _filterSize; fy++)
+                    {
+                        for (int fx = 0; fx < _filterSize; fx++)
+                        {
+                            int inputY = y_out * _stride + fy - _padding;
+                            int inputX = x_out * _stride + fx - _padding;
+
+                            if (inputY >= 0 && inputY < _lastInput.Height && inputX >= 0 && inputX < _lastInput.Width)
+                            {
+                                for (int d = 0; d < _lastInput.Depth; d++)
+                                {
+                                    // Обновляем градиент для фильтра
+                                    filterGradData[(fy * _filterSize + fx) * _lastInput.Depth + d] += _lastInput[inputX, inputY, d] * grad;
+                                    // Обновляем градиент для входа
+                                    inputGradient[inputX, inputY, d] += filterData[(fy * _filterSize + fx) * _lastInput.Depth + d] * grad;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -104,14 +176,23 @@ public class ConvolutionalLayer : ILayer
 
     public override void UpdateParameters(float learningRate)
     {
+        float lr = (float)learningRate;
         for (int f = 0; f < _filterCount; f++)
         {
-            for (int d = 0; d < Filters[f].Depth; d++)
-                for (int y = 0; y < _filterSize; y++)
-                    for (int x = 0; x < _filterSize; x++)
-                        Filters[f][x, y, d] -= _filterGradients[f][x, y, d] * learningRate;
+            // Обновляем веса фильтров
+            float* filterData = Filters[f]._data;
+            float* filterGradData = _filterGradients[f]._data;
+            int size = Filters[f].Size;
+            for (int i = 0; i < size; i++)
+            {
+                filterData[i] -= filterGradData[i] * lr;
+            }
 
-            Biases[f] -= _biasGradients[f] * learningRate;
+            // Обновляем смещения
+            Biases[f] -= _biasGradients[f] * lr;
         }
     }
+
+    // Важно: IDisposable и ILayer-контракт
+    // Убедитесь, что ILayer, Tensor, Matrix реализуют IDisposable и правильно освобождают ресурсы
 }
