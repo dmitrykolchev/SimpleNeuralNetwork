@@ -18,7 +18,8 @@ public sealed unsafe class Matrix : IDisposable
     public readonly int Size;
 
     // Сделан internal для прямого доступа из других unsafe-классов (Tensor) без копирования.
-    internal readonly float[] _data;
+    internal readonly float[] _data = null!;
+
     private bool _disposed = false;
 
     public float this[int row, int col]
@@ -126,46 +127,28 @@ public sealed unsafe class Matrix : IDisposable
 
     public static Matrix Multiply(Matrix a, bool aTransposed, Matrix b, bool bTransposed)
     {
-        bool aDispose = false, bDispose = false;
         if (aTransposed)
         {
             a = Transpose(a);
-            aDispose = true;
         }
         if (!bTransposed)
         {
             b = Transpose(b);
-            bDispose = true;
         }
 
         var result = new Matrix(a.Rows, b.Rows);
         if (result._data == null) return result;
-        try
+        int aCols = a.Cols;
+        for (int i = 0; i < a.Rows; i++)
         {
-            int aCols = a.Cols;
-            //for (int i = 0; i < a.Rows; i++)
-            Parallel.For(0, a.Rows, i =>
+            var rowA = a._data.AsSpan(i * aCols, aCols);
+            for (int j = 0; j < b.Rows; j++)
             {
-                var rowA = a._data.AsSpan(i * aCols, aCols);
-                for (int j = 0; j < b.Rows; j++)
-                {
-                    var rowB = b._data.AsSpan(j * aCols, aCols);
-                    result._data[i * result.Cols + j] = TensorPrimitives.Dot(rowA, rowB);
-                }
-            });
-            return result;
-        }
-        finally
-        {
-            if (aDispose)
-            {
-                a.Dispose();
-            }
-            if (bDispose)
-            {
-                b.Dispose();
+                var rowB = b._data.AsSpan(j * aCols, aCols);
+                result._data[i * result.Cols + j] = TensorPrimitives.Dot(rowA, rowB);
             }
         }
+        return result;
     }
 
     /// <summary>

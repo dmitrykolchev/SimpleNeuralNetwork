@@ -8,9 +8,9 @@ namespace NeuralNetwork;
 // LinearLayer.cs
 public class LinearLayer : ILayer
 {
-    private Matrix? _lastInput;
-    private Matrix? _weightGradients;
-    private Matrix? _biasGradients;
+    private Matrix _lastInput = null!;
+    private Matrix _weightGradients = null!;
+    private Matrix _biasGradients = null!;
 
     public LinearLayer(int inputSize, int outputSize)
     {

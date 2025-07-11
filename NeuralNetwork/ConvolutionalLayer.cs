@@ -23,9 +23,9 @@ public sealed unsafe class ConvolutionalLayer : ILayer
     private readonly PaddingType _paddingType;
     private readonly int _padding; // Рассчитанное значение паддинга
 
-    private List<Tensor> _filterGradients;
-    private float[] _biasGradients;
-    private Tensor _lastInput;
+    private List<SimpleTensor> _filterGradients = null!;
+    private float[] _biasGradients = null!;
+    private SimpleTensor _lastInput = null!;
 
     public ConvolutionalLayer(int filterCount, int filterSize, int stride, int inputDepth, PaddingType paddingType)
     {
@@ -50,12 +50,12 @@ public sealed unsafe class ConvolutionalLayer : ILayer
             _padding = 0;
         }
 
-        Filters = new List<Tensor>();
+        Filters = new List<SimpleTensor>();
         Biases = new float[filterCount];
 
         for (int i = 0; i < filterCount; i++)
         {
-            var filter = new Tensor(filterSize, filterSize, inputDepth);
+            var filter = new SimpleTensor(filterSize, filterSize, inputDepth);
             filter.Randomize(fanIn: filterSize * filterSize * inputDepth);
             Filters.Add(filter);
             Biases[i] = 0; // Инициализация смещений нулями - частая практика
@@ -63,18 +63,18 @@ public sealed unsafe class ConvolutionalLayer : ILayer
     }
 
     // Используем наши высокопроизводительные классы
-    public List<Tensor> Filters { get; private set; }
+    public List<SimpleTensor> Filters { get; private set; }
     public float[] Biases { get; private set; }
 
     public override object Forward(object input)
     {
-        _lastInput = (Tensor)input;
+        _lastInput = (SimpleTensor)input;
 
         // Формула выхода с учетом паддинга: W_out = (W_in - F + 2P) / S + 1
         int outputHeight = (_lastInput.Height - _filterSize + 2 * _padding) / _stride + 1;
         int outputWidth = (_lastInput.Width - _filterSize + 2 * _padding) / _stride + 1;
 
-        var output = new Tensor(outputWidth, outputHeight, _filterCount);
+        var output = new SimpleTensor(outputWidth, outputHeight, _filterCount);
 
         // Обнуляем выходной тензор
         for (int f = 0; f < _filterCount; f++) // Для каждого фильтра
@@ -117,13 +117,13 @@ public sealed unsafe class ConvolutionalLayer : ILayer
 
     public override object Backward(object outputGradientObj)
     {
-        var outputGradient = (Tensor)outputGradientObj;
-        var inputGradient = new Tensor(_lastInput.Width, _lastInput.Height, _lastInput.Depth);
+        var outputGradient = (SimpleTensor)outputGradientObj;
+        var inputGradient = new SimpleTensor(_lastInput.Width, _lastInput.Height, _lastInput.Depth);
 
-        _filterGradients = new List<Tensor>();
+        _filterGradients = new List<SimpleTensor>();
         for (int i = 0; i < _filterCount; i++)
         {
-            var gradTensor = new Tensor(_filterSize, _filterSize, _lastInput.Depth);
+            var gradTensor = new SimpleTensor(_filterSize, _filterSize, _lastInput.Depth);
             _filterGradients.Add(gradTensor);
         }
         _biasGradients = new float[_filterCount];

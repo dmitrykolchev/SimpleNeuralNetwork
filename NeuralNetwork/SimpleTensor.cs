@@ -1,5 +1,4 @@
-﻿// Tensor.cs
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Numerics.Tensors;
 using System.Runtime.CompilerServices;
 
@@ -11,16 +10,18 @@ namespace NeuralNetwork;
 /// чтобы избежать утечек нативной памяти.
 /// </summary>
 [DebuggerDisplay("(w:{Width}, h:{Height}, d:{Depth}), size:{Size}")]
-public sealed unsafe class Tensor : IDisposable
+public sealed unsafe class SimpleTensor : IDisposable
 {
-    // Указатель на начало блока неуправляемой, выровненной памяти.
     // Сделан internal для эффективного взаимодействия с другими unsafe классами (Matrix).
-    internal readonly float[]? _data;
+    internal readonly float[] _data = null!;
     private bool _disposed = false;
-    public Tensor(int width, int height, int depth)
+
+    public SimpleTensor(int width, int height, int depth)
     {
         if (width < 0 || height < 0 || depth < 0)
+        {
             throw new ArgumentOutOfRangeException("Tensor dimensions cannot be negative.");
+        }
 
         Width = width;
         Height = height;
@@ -29,17 +30,16 @@ public sealed unsafe class Tensor : IDisposable
 
         if (Size == 0)
         {
-            _data = null;
             return;
         }
 
         _data = new float[Size];
     }
 
-    public int Width { get; }
-    public int Height { get; }
-    public int Depth { get; }
-    public int Size { get; }
+    public readonly int Width;
+    public readonly int Height;
+    public readonly int Depth;
+    public readonly int Size;
 
     /// <summary>
     /// Индексатор для доступа к элементам тензора. В debug-сборке выполняет проверку границ.
@@ -56,15 +56,15 @@ public sealed unsafe class Tensor : IDisposable
 #endif
             return ref _data[(h * Width + w) * Depth + d];
         }
-//        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-//        set
-//        {
-//#if DEBUG
-//            if (w < 0 || w >= Width || h < 0 || h >= Height || d < 0 || d >= Depth)
-//                throw new IndexOutOfRangeException();
-//#endif
-//            _data[(h * Width + w) * Depth + d] = value;
-//        }
+        //        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //        set
+        //        {
+        //#if DEBUG
+        //            if (w < 0 || w >= Width || h < 0 || h >= Height || d < 0 || d >= Depth)
+        //                throw new IndexOutOfRangeException();
+        //#endif
+        //            _data[(h * Width + w) * Depth + d] = value;
+        //        }
     }
 
     /// <summary>
@@ -83,12 +83,12 @@ public sealed unsafe class Tensor : IDisposable
     /// <summary>
     /// Создает тензор из плоской матрицы-вектора. Не копирует данные, а создает новый тензор.
     /// </summary>
-    public static Tensor FromMatrix(Matrix matrix, int width, int height, int depth)
+    public static SimpleTensor FromMatrix(Matrix matrix, int width, int height, int depth)
     {
         if (matrix.Size != width * height * depth)
             throw new ArgumentException("Matrix size does not match target tensor dimensions.");
 
-        var tensor = new Tensor(width, height, depth);
+        var tensor = new SimpleTensor(width, height, depth);
         if (tensor._data != null)
         {
             Array.Copy(matrix._data, 0, tensor._data, 0, tensor.Size);
@@ -115,9 +115,9 @@ public sealed unsafe class Tensor : IDisposable
     /// Эта операция не векторизована, т.к. Func<T, T> не может быть транслирован в SIMD.
     /// Для стандартных операций (ReLU) следует писать отдельные векторизованные методы.
     /// </summary>
-    public Tensor Map(Action<ReadOnlySpan<float>, Span<float>> func)
+    public SimpleTensor Map(Action<ReadOnlySpan<float>, Span<float>> func)
     {
-        var result = new Tensor(Width, Height, Depth);
+        var result = new SimpleTensor(Width, Height, Depth);
         if (_data == null) return result;
         func(_data, result._data);
         return result;
@@ -127,19 +127,19 @@ public sealed unsafe class Tensor : IDisposable
     /// Выполняет поэлементное умножение (произведение Адамара) двух тензоров.
     /// Оптимизировано с использованием AVX.
     /// </summary>
-    public static Tensor Hadamard(Tensor a, Tensor b)
+    public static SimpleTensor Hadamard(SimpleTensor a, SimpleTensor b)
     {
         if (a.Width != b.Width || a.Height != b.Height || a.Depth != b.Depth)
             throw new ArgumentException("Tensors must have same dimensions for Hadamard product.");
 
-        var result = new Tensor(a.Width, a.Height, a.Depth);
+        var result = new SimpleTensor(a.Width, a.Height, a.Depth);
         if (result._data == null) return result;
 
         TensorPrimitives.Multiply(a._data, b._data, result._data);
         return result;
     }
 
-    public static void Hadamard(Tensor a, Tensor b, Tensor result)
+    public static void Hadamard(SimpleTensor a, SimpleTensor b, SimpleTensor result)
     {
         if (a.Width != b.Width || a.Height != b.Height || a.Depth != b.Depth)
             throw new ArgumentException("Tensors must have same dimensions for Hadamard product.");

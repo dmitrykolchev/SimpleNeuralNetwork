@@ -4,8 +4,8 @@ public class MaxPoolingLayer : ILayer
 {
     private readonly int _poolSize;
     private readonly int _stride;
-    private Tensor _lastInput;
-    private Tensor _maxIndices; // Сохраняем индексы для обратного прохода
+    private SimpleTensor _lastInput = null!;
+    private SimpleTensor _maxIndices = null!; // Сохраняем индексы для обратного прохода
 
     public MaxPoolingLayer(int poolSize, int stride)
     {
@@ -15,12 +15,12 @@ public class MaxPoolingLayer : ILayer
 
     public override object Forward(object input)
     {
-        _lastInput = (Tensor)input;
+        _lastInput = (SimpleTensor)input;
 
         int outputWidth = (_lastInput.Width - _poolSize) / _stride + 1;
         int outputHeight = (_lastInput.Height - _poolSize) / _stride + 1;
-        var output = new Tensor(outputWidth, outputHeight, _lastInput.Depth);
-        _maxIndices = new Tensor(outputWidth, outputHeight, _lastInput.Depth);
+        var output = new SimpleTensor(outputWidth, outputHeight, _lastInput.Depth);
+        _maxIndices = new SimpleTensor(outputWidth, outputHeight, _lastInput.Depth);
 
         for (int d = 0; d < _lastInput.Depth; d++)
         {
@@ -56,8 +56,8 @@ public class MaxPoolingLayer : ILayer
 
     public override object Backward(object outputGradientObj)
     {
-        var outputGradient = (Tensor)outputGradientObj;
-        var inputGradient = new Tensor(_lastInput.Width, _lastInput.Height, _lastInput.Depth);
+        var outputGradient = (SimpleTensor)outputGradientObj;
+        var inputGradient = new SimpleTensor(_lastInput.Width, _lastInput.Height, _lastInput.Depth);
 
         for (int d = 0; d < outputGradient.Depth; d++)
         {

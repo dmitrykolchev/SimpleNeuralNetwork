@@ -8,7 +8,7 @@ public class ActivationLayer : ILayer
     // ... (конструктор тот же)
     private readonly Action<ReadOnlySpan<float>, Span<float>> _activation;
     private readonly Action<ReadOnlySpan<float>, Span<float>> _activationDerivative;
-    private object _lastInput;
+    private object _lastInput = null!;
 
     public ActivationLayer(
         Action<ReadOnlySpan<float>, Span<float>> activation, 
@@ -25,7 +25,7 @@ public class ActivationLayer : ILayer
         {
             return m.Map(_activation);
         }
-        if (input is Tensor t)
+        if (input is SimpleTensor t)
         {
             return t.Map(_activation);
         }
@@ -39,10 +39,10 @@ public class ActivationLayer : ILayer
             Matrix activationDerivative = lastInputM.Map(_activationDerivative);
             return Matrix.Hadamard(gradM, activationDerivative);
         }
-        if (_lastInput is Tensor lastInputT && outputGradient is Tensor gradT)
+        if (_lastInput is SimpleTensor lastInputT && outputGradient is SimpleTensor gradT)
         {
             var result = lastInputT.Map(_activationDerivative);
-            Tensor.Hadamard(gradT, result, result);
+            SimpleTensor.Hadamard(gradT, result, result);
             return result;
         }
         throw new ArgumentException("Unsupported input type for ActivationLayer backward pass");

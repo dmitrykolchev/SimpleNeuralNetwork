@@ -55,7 +55,7 @@ class Program
         var cnnTrainingData = new List<(object, Matrix)>();
         foreach (var (inputMatrix, target) in trainingData)
         {
-            var inputTensor = Tensor.FromMatrix(inputMatrix, 28, 28, 1);
+            var inputTensor = SimpleTensor.FromMatrix(inputMatrix, 28, 28, 1);
             cnnTrainingData.Add((inputTensor, target));
         }
 
@@ -71,7 +71,7 @@ class Program
 
         foreach (var (inputMatrix, target) in cnnTestData)
         {
-            var inputTensor = Tensor.FromMatrix(inputMatrix, 28, 28, 1);
+            var inputTensor = SimpleTensor.FromMatrix(inputMatrix, 28, 28, 1);
             // Убедимся, что Predict в NeuralNetwork также работает с object
             Matrix prediction = (Matrix)network.Predict(inputTensor);
             if (prediction.GetPredictedClass() == target.GetPredictedClass())

@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace NeuralNetwork;
+﻿namespace NeuralNetwork;
 // CompositeLayer.cs
 
-public class CompositeLayer : ILayer
+public class SequentialLayer : ILayer
 {
     private readonly List<ILayer> _layers = new List<ILayer>();
 
