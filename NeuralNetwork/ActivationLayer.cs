@@ -1,14 +1,18 @@
-﻿namespace NeuralNetwork;
+﻿using System.Numerics.Tensors;
+
+namespace NeuralNetwork;
 // ActivationLayer.cs
 // ActivationLayer.cs
 public class ActivationLayer : ILayer
 {
     // ... (конструктор тот же)
-    private readonly Func<float, float> _activation;
-    private readonly Func<float, float> _activationDerivative;
+    private readonly Action<ReadOnlySpan<float>, Span<float>> _activation;
+    private readonly Action<ReadOnlySpan<float>, Span<float>> _activationDerivative;
     private object _lastInput;
 
-    public ActivationLayer(Func<float, float> activation, Func<float, float> activationDerivative)
+    public ActivationLayer(
+        Action<ReadOnlySpan<float>, Span<float>> activation, 
+        Action<ReadOnlySpan<float>, Span<float>> activationDerivative)
     {
         _activation = activation;
         _activationDerivative = activationDerivative;
@@ -37,14 +41,8 @@ public class ActivationLayer : ILayer
         }
         if (_lastInput is Tensor lastInputT && outputGradient is Tensor gradT)
         {
-            var result = new Tensor(lastInputT.Width, lastInputT.Height, lastInputT.Depth);
-            for (int d = 0; d < lastInputT.Depth; d++)
-                for (int h = 0; h < lastInputT.Height; h++)
-                    for (int w = 0; w < lastInputT.Width; w++)
-                    {
-                        var derivative = _activationDerivative(lastInputT[w, h, d]);
-                        result[w, h, d] = gradT[w, h, d] * derivative;
-                    }
+            var result = lastInputT.Map(_activationDerivative);
+            Tensor.Hadamard(gradT, result, result);
             return result;
         }
         throw new ArgumentException("Unsupported input type for ActivationLayer backward pass");

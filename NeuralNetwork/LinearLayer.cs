@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Text;
 
 namespace NeuralNetwork;
@@ -7,12 +8,9 @@ namespace NeuralNetwork;
 // LinearLayer.cs
 public class LinearLayer : ILayer
 {
-    public Matrix Weights { get; private set; }
-    public Matrix Biases { get; private set; }
-
-    private Matrix _lastInput;
-    private Matrix _weightGradients;
-    private Matrix _biasGradients;
+    private Matrix? _lastInput;
+    private Matrix? _weightGradients;
+    private Matrix? _biasGradients;
 
     public LinearLayer(int inputSize, int outputSize)
     {
@@ -22,22 +20,26 @@ public class LinearLayer : ILayer
         Biases.Randomize();
     }
 
+    public Matrix Weights { get; private set; }
+
+    public Matrix Biases { get; private set; }
+
     public override object Forward(object input)
     {
         _lastInput = (Matrix)input;
-        return (Weights * (Matrix)input) + Biases;
+        return Matrix.Multiply(Weights, false, (Matrix)input, false) + Biases;
     }
 
     public override object Backward(object outputGradient)
     {
         // Градиент для весов: dE/dW = dE/dY * X^T
-        _weightGradients = (Matrix)outputGradient * Matrix.Transpose(_lastInput);
+        _weightGradients = Matrix.Multiply((Matrix)outputGradient, false, _lastInput, true);
 
         // Градиент для смещений: dE/dB = dE/dY
         _biasGradients = (Matrix)outputGradient;
 
         // Градиент для передачи на предыдущий слой: dE/dX = W^T * dE/dY
-        Matrix inputGradient = Matrix.Transpose(Weights) * (Matrix)outputGradient;
+        Matrix inputGradient = Matrix.Multiply(Weights, true, (Matrix)outputGradient, false);
 
         return inputGradient;
     }

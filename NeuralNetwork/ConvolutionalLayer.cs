@@ -1,33 +1,27 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Numerics.Tensors;
 
 namespace NeuralNetwork;
 
-// Необходимые using'и для Tensor и Matrix
-// using ...
+public enum PaddingType
+{
+    /// <summary>
+    /// Без паддинга. Размер выхода будет меньше входа.
+    /// </summary>
+    Valid,
+    /// <summary>
+    /// Паддинг для сохранения размеров входа при stride=1.
+    /// </summary>
+    Same
+}
+
 
 public sealed unsafe class ConvolutionalLayer : ILayer
 {
-    public enum PaddingType
-    {
-        /// <summary>
-        /// Без паддинга. Размер выхода будет меньше входа.
-        /// </summary>
-        Valid,
-        /// <summary>
-        /// Паддинг для сохранения размеров входа при stride=1.
-        /// </summary>
-        Same
-    }
-
     private readonly int _filterCount;
     private readonly int _filterSize;
     private readonly int _stride;
     private readonly PaddingType _paddingType;
     private readonly int _padding; // Рассчитанное значение паддинга
-
-    // Используем наши высокопроизводительные классы
-    public List<Tensor> Filters { get; private set; }
-    public float[] Biases { get; private set; }
 
     private List<Tensor> _filterGradients;
     private float[] _biasGradients;
@@ -58,7 +52,6 @@ public sealed unsafe class ConvolutionalLayer : ILayer
 
         Filters = new List<Tensor>();
         Biases = new float[filterCount];
-        var rand = new Random();
 
         for (int i = 0; i < filterCount; i++)
         {
@@ -68,6 +61,10 @@ public sealed unsafe class ConvolutionalLayer : ILayer
             Biases[i] = 0; // Инициализация смещений нулями - частая практика
         }
     }
+
+    // Используем наши высокопроизводительные классы
+    public List<Tensor> Filters { get; private set; }
+    public float[] Biases { get; private set; }
 
     public override object Forward(object input)
     {
@@ -80,11 +77,9 @@ public sealed unsafe class ConvolutionalLayer : ILayer
         var output = new Tensor(outputWidth, outputHeight, _filterCount);
 
         // Обнуляем выходной тензор
-        NativeMemory.Clear(output._data, (nuint)(output.Size * sizeof(float)));
-
         for (int f = 0; f < _filterCount; f++) // Для каждого фильтра
         {
-            float* filterData = Filters[f]._data;
+            var filterData = Filters[f]._data;
             for (int y_out = 0; y_out < outputHeight; y_out++)
             {
                 for (int x_out = 0; x_out < outputWidth; x_out++)
@@ -125,22 +120,18 @@ public sealed unsafe class ConvolutionalLayer : ILayer
         var outputGradient = (Tensor)outputGradientObj;
         var inputGradient = new Tensor(_lastInput.Width, _lastInput.Height, _lastInput.Depth);
 
-        // Обнуляем градиенты перед накоплением
-        NativeMemory.Clear(inputGradient._data, (nuint)(inputGradient.Size * sizeof(float)));
-
         _filterGradients = new List<Tensor>();
         for (int i = 0; i < _filterCount; i++)
         {
             var gradTensor = new Tensor(_filterSize, _filterSize, _lastInput.Depth);
-            NativeMemory.Clear(gradTensor._data, (nuint)gradTensor.Size * sizeof(float));
             _filterGradients.Add(gradTensor);
         }
         _biasGradients = new float[_filterCount];
 
         for (int f = 0; f < _filterCount; f++)
         {
-            float* filterData = Filters[f]._data;
-            float* filterGradData = _filterGradients[f]._data;
+            var filterData = Filters[f]._data;
+            var filterGradData = _filterGradients[f]._data;
 
             for (int y_out = 0; y_out < outputGradient.Height; y_out++)
             {
@@ -180,19 +171,12 @@ public sealed unsafe class ConvolutionalLayer : ILayer
         for (int f = 0; f < _filterCount; f++)
         {
             // Обновляем веса фильтров
-            float* filterData = Filters[f]._data;
-            float* filterGradData = _filterGradients[f]._data;
+            var filterData = Filters[f]._data;
+            var filterGradData = _filterGradients[f]._data;
             int size = Filters[f].Size;
-            for (int i = 0; i < size; i++)
-            {
-                filterData[i] -= filterGradData[i] * lr;
-            }
-
-            // Обновляем смещения
-            Biases[f] -= _biasGradients[f] * lr;
+            TensorPrimitives.MultiplyAdd(filterGradData, -lr, filterData, filterData);
         }
+        // Обновляем смещения
+        TensorPrimitives.MultiplyAdd(_biasGradients, -lr, Biases, Biases);
     }
-
-    // Важно: IDisposable и ILayer-контракт
-    // Убедитесь, что ILayer, Tensor, Matrix реализуют IDisposable и правильно освобождают ресурсы
 }

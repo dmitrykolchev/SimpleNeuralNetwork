@@ -1,9 +1,7 @@
 ﻿// Matrix.cs
-using System;
-using System.Runtime.InteropServices;
+using System.Diagnostics;
+using System.Numerics.Tensors;
 using System.Runtime.CompilerServices;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 
 namespace NeuralNetwork;
 
@@ -12,6 +10,7 @@ namespace NeuralNetwork;
 /// КРИТИЧЕСКИ ВАЖНО: Объекты этого класса ДОЛЖНЫ быть освобождены через Dispose() или блок using,
 /// чтобы избежать утечек нативной памяти.
 /// </summary>
+[DebuggerDisplay("(r:{Rows}, c:{Cols}), size:{Size}")]
 public sealed unsafe class Matrix : IDisposable
 {
     public readonly int Rows;
@@ -19,7 +18,7 @@ public sealed unsafe class Matrix : IDisposable
     public readonly int Size;
 
     // Сделан internal для прямого доступа из других unsafe-классов (Tensor) без копирования.
-    internal readonly float* _data;
+    internal readonly float[] _data;
     private bool _disposed = false;
 
     public float this[int row, int col]
@@ -55,17 +54,10 @@ public sealed unsafe class Matrix : IDisposable
 
         if (Size == 0)
         {
-            _data = null;
             return;
         }
-
-        const nuint alignment = 32;
-        nuint byteCount = (nuint)(Size * sizeof(float));
-        _data = (float*)NativeMemory.AlignedAlloc(byteCount, alignment);
-        NativeMemory.Fill(_data, byteCount, 0);
+        _data = new float[Size];
     }
-
-    #region Статические методы создания и AVX-операторы
 
     public static Matrix FromArray(float[,] data)
     {
@@ -74,7 +66,7 @@ public sealed unsafe class Matrix : IDisposable
         var m = new Matrix(rows, cols);
         if (m._data == null) return m;
 
-        float* ptr = m._data;
+        var ptr = m._data;
         int k = 0;
         for (int i = 0; i < rows; i++)
         {
@@ -90,11 +82,7 @@ public sealed unsafe class Matrix : IDisposable
     {
         var m = new Matrix(data.Length, 1);
         if (m._data == null) return m;
-
-        fixed (float* pSource = data)
-        {
-            Buffer.MemoryCopy(pSource, m._data, m.Size * sizeof(float), m.Size * sizeof(float));
-        }
+        Array.Copy(data, 0, m._data, 0, data.Length);
         return m;
     }
 
@@ -106,26 +94,10 @@ public sealed unsafe class Matrix : IDisposable
         var result = new Matrix(a.Rows, a.Cols);
         if (result._data == null) return result;
 
-        float* ptrA = a._data;
-        float* ptrB = b._data;
-        float* ptrResult = result._data;
-        int i = 0;
-
-        if (Avx.IsSupported)
-        {
-            int vecSize = Vector256<float>.Count;
-            for (; i <= a.Size - vecSize; i += vecSize)
-            {
-                var va = Avx.LoadAlignedVector256(ptrA + i);
-                var vb = Avx.LoadAlignedVector256(ptrB + i);
-                var vr = Avx.Add(va, vb);
-                Avx.StoreAlignedNonTemporal(ptrResult + i, vr);
-            }
-        }
-        for (; i < a.Size; i++)
-        {
-            ptrResult[i] = ptrA[i] + ptrB[i];
-        }
+        TensorPrimitives.Add(
+            a._data,
+            b._data,
+            result._data);
         return result;
     }
 
@@ -137,26 +109,10 @@ public sealed unsafe class Matrix : IDisposable
         var result = new Matrix(a.Rows, a.Cols);
         if (result._data == null) return result;
 
-        float* ptrA = a._data;
-        float* ptrB = b._data;
-        float* ptrResult = result._data;
-        int i = 0;
-
-        if (Avx.IsSupported)
-        {
-            int vecSize = Vector256<float>.Count;
-            for (; i <= a.Size - vecSize; i += vecSize)
-            {
-                var va = Avx.LoadAlignedVector256(ptrA + i);
-                var vb = Avx.LoadAlignedVector256(ptrB + i);
-                var vr = Avx.Subtract(va, vb);
-                Avx.StoreAlignedNonTemporal(ptrResult + i, vr);
-            }
-        }
-        for (; i < a.Size; i++)
-        {
-            ptrResult[i] = ptrA[i] - ptrB[i];
-        }
+        TensorPrimitives.Subtract(
+            a._data,
+            b._data,
+            result._data);
         return result;
     }
 
@@ -164,82 +120,56 @@ public sealed unsafe class Matrix : IDisposable
     {
         var result = new Matrix(a.Rows, a.Cols);
         if (result._data == null) return result;
-
-        float* ptrA = a._data;
-        float* ptrResult = result._data;
-        int i = 0;
-
-        if (Avx.IsSupported)
-        {
-            var vscalar = Vector256.Create(scalar);
-            int vecSize = Vector256<float>.Count;
-            for (; i <= a.Size - vecSize; i += vecSize)
-            {
-                var va = Avx.LoadAlignedVector256(ptrA + i);
-                var vr = Avx.Multiply(va, vscalar);
-                Avx.StoreAlignedNonTemporal(ptrResult + i, vr);
-            }
-        }
-        for (; i < a.Size; i++)
-        {
-            ptrResult[i] = ptrA[i] * scalar;
-        }
+        TensorPrimitives.Multiply(a._data, scalar, result._data);
         return result;
     }
 
-    public static Matrix operator *(Matrix a, Matrix b)
+    public static Matrix Multiply(Matrix a, bool aTransposed, Matrix b, bool bTransposed)
     {
-        if (a.Cols != b.Rows)
-            throw new ArgumentException("Matrix dimensions are not compatible for multiplication.");
-
-        var result = new Matrix(a.Rows, b.Cols);
-        if (result._data == null) return result;
-
-        using var bT = Transpose(b);
-
-        float* ptrA = a._data;
-        float* ptrBT = bT._data;
-        float* ptrResult = result._data;
-        int aCols = a.Cols;
-
-        for (int i = 0; i < a.Rows; i++)
+        bool aDispose = false, bDispose = false;
+        if (aTransposed)
         {
-            float* rowA = ptrA + i * aCols;
-            for (int j = 0; j < bT.Rows; j++)
+            a = Transpose(a);
+            aDispose = true;
+        }
+        if (!bTransposed)
+        {
+            b = Transpose(b);
+            bDispose = true;
+        }
+
+        var result = new Matrix(a.Rows, b.Rows);
+        if (result._data == null) return result;
+        try
+        {
+            int aCols = a.Cols;
+            //for (int i = 0; i < a.Rows; i++)
+            Parallel.For(0, a.Rows, i =>
             {
-                float* rowBT = ptrBT + j * aCols;
-
-                float sum = 0;
-                int k = 0;
-                if (Avx.IsSupported)
+                var rowA = a._data.AsSpan(i * aCols, aCols);
+                for (int j = 0; j < b.Rows; j++)
                 {
-                    var vsum = Vector256<float>.Zero;
-                    int vecSize = Vector256<float>.Count;
-                    for (; k <= aCols - vecSize; k += vecSize)
-                    {
-                        var va = Avx.LoadVector256(rowA + k);
-                        var vb = Avx.LoadVector256(rowBT + k);
-                        vsum = Fma.IsSupported ? Fma.MultiplyAdd(va, vb, vsum) : Avx.Add(vsum, Avx.Multiply(va, vb));
-                    }
-
-                    vsum = Avx.HorizontalAdd(vsum, vsum);
-                    vsum = Avx.HorizontalAdd(vsum, vsum);
-                    sum += vsum.GetElement(0) + vsum.GetElement(4);
+                    var rowB = b._data.AsSpan(j * aCols, aCols);
+                    result._data[i * result.Cols + j] = TensorPrimitives.Dot(rowA, rowB);
                 }
-
-                for (; k < aCols; k++)
-                {
-                    sum += rowA[k] * rowBT[k];
-                }
-                ptrResult[i * result.Cols + j] = sum;
+            });
+            return result;
+        }
+        finally
+        {
+            if (aDispose)
+            {
+                a.Dispose();
+            }
+            if (bDispose)
+            {
+                b.Dispose();
             }
         }
-        return result;
     }
 
     /// <summary>
     /// Выполняет поэлементное умножение матриц (произведение Адамара).
-    /// Оптимизировано с использованием AVX-инструкций.
     /// </summary>
     public static Matrix Hadamard(Matrix a, Matrix b)
     {
@@ -249,31 +179,12 @@ public sealed unsafe class Matrix : IDisposable
         var result = new Matrix(a.Rows, a.Cols);
         if (result._data == null) return result;
 
-        float* ptrA = a._data;
-        float* ptrB = b._data;
-        float* ptrResult = result._data;
-        int i = 0;
-
-        if (Avx.IsSupported)
-        {
-            int vecSize = Vector256<float>.Count; // 8
-            for (; i <= a.Size - vecSize; i += vecSize)
-            {
-                var va = Avx.LoadAlignedVector256(ptrA + i);
-                var vb = Avx.LoadAlignedVector256(ptrB + i);
-                var vr = Avx.Multiply(va, vb);
-                Avx.StoreAlignedNonTemporal(ptrResult + i, vr);
-            }
-        }
-        // Обрабатываем остаток
-        for (; i < a.Size; i++)
-        {
-            ptrResult[i] = ptrA[i] * ptrB[i];
-        }
+        TensorPrimitives.Multiply(
+            a._data,
+            b._data,
+            result._data);
         return result;
     }
-
-    #endregion
 
     #region Другие методы
 
@@ -282,14 +193,11 @@ public sealed unsafe class Matrix : IDisposable
         var result = new Matrix(m.Cols, m.Rows);
         if (result._data == null) return result;
 
-        float* ptrM = m._data;
-        float* ptrResult = result._data;
-
         for (int i = 0; i < m.Rows; i++)
         {
             for (int j = 0; j < m.Cols; j++)
             {
-                ptrResult[j * result.Cols + i] = ptrM[i * m.Cols + j];
+                result._data[j * result.Cols + i] = m._data[i * m.Cols + j];
             }
         }
         return result;
@@ -302,7 +210,7 @@ public sealed unsafe class Matrix : IDisposable
         var scale = (float)Math.Sqrt(1.0 / Rows);
         for (int i = 0; i < Size; i++)
         {
-            _data[i] = ((float)rand.NextDouble() * 2f - 1f) * scale;
+            _data[i] = (rand.NextSingle() * 2f - 1f) * scale;
         }
     }
 
@@ -328,18 +236,11 @@ public sealed unsafe class Matrix : IDisposable
     /// Для стандартных функций активации (ReLU, Sigmoid) следует создавать специализированные
     /// векторизованные методы для максимальной производительности.
     /// </summary>
-    public Matrix Map(Func<float, float> func)
+    public Matrix Map(Action<ReadOnlySpan<float>, Span<float>> func)
     {
         var result = new Matrix(Rows, Cols);
         if (result._data == null) return result;
-
-        float* ptrSource = this._data;
-        float* ptrDest = result._data;
-
-        for (int i = 0; i < Size; i++)
-        {
-            ptrDest[i] = func(ptrSource[i]);
-        }
+        func(_data.AsSpan(), result._data.AsSpan());
         return result;
     }
 
@@ -357,10 +258,6 @@ public sealed unsafe class Matrix : IDisposable
     {
         if (!_disposed)
         {
-            if (_data != null)
-            {
-                NativeMemory.AlignedFree(_data);
-            }
             _disposed = true;
         }
     }

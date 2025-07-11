@@ -13,24 +13,33 @@ class Program
         var testData = MnistLoader.LoadData("../../../../mnist-data/t10k-images.idx3-ubyte", "../../../../mnist-data/t10k-labels.idx1-ubyte");
         Console.WriteLine("Data loaded.");
 
-        var network = new NeuralNetwork();
+        var network = new NeuralNetwork(new MeanSquaredError());
 
         // Архитектура CNN (похожая на LeNet)
         // Вход: 28x28x1
-        network.AddLayer(new ConvolutionalLayer(filterCount: 6, filterSize: 5, stride: 1, inputDepth: 1,
-            paddingType: ConvolutionalLayer.PaddingType.Same)); // Выход: 24x24x6
+        network.AddLayer(new ConvolutionalLayer(
+            filterCount: 6, 
+            filterSize: 5, 
+            stride: 1, 
+            inputDepth: 1,
+            paddingType: PaddingType.Same)); // Выход: 24x24x6
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
         network.AddLayer(new MaxPoolingLayer(poolSize: 2, stride: 2)); // Выход: 12x12x6
 
-        network.AddLayer(new ConvolutionalLayer(filterCount: 16, filterSize: 5, stride: 1, inputDepth: 6,
-            paddingType: ConvolutionalLayer.PaddingType.Same)); // Выход: 8x8x16
-
+        network.AddLayer(new ConvolutionalLayer(
+            filterCount: 16, 
+            filterSize: 5, 
+            stride: 1, 
+            inputDepth: 6,
+            paddingType: PaddingType.Same)); // Выход: 8x8x16
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
         network.AddLayer(new MaxPoolingLayer(poolSize: 2, stride: 2)); // Выход: 4x4x16
 
         network.AddLayer(new FlattenLayer()); // Выход: Matrix (256x1)
 
-        network.AddLayer(new LinearLayer(inputSize: 7 * 7 * 16, outputSize: 120));
+        network.AddLayer(new LinearLayer(
+            inputSize: 7 * 7 * 16, 
+            outputSize: 120));
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
 
         network.AddLayer(new LinearLayer(inputSize: 120, outputSize: 84));
@@ -38,7 +47,7 @@ class Program
 
         network.AddLayer(new LinearLayer(inputSize: 84, outputSize: 10));
 
-        network.SetLossFunction(new MeanSquaredError());
+        //network.SetLossFunction();
 
         Console.WriteLine("Starting CNN training... This will be slow!");
 

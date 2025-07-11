@@ -1,13 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace NeuralNetwork;
+﻿namespace NeuralNetwork;
 // NeuralNetwork.cs
 public class NeuralNetwork
 {
-    private readonly List<ILayer> _layers = new List<ILayer>();
+    private readonly List<ILayer> _layers = new();
     private ILossFunction _lossFunction;
+
+    public NeuralNetwork(ILossFunction lossFunction)
+    {
+        _lossFunction = lossFunction;
+    }
 
     public void AddLayer(ILayer layer)
     {
@@ -60,7 +61,7 @@ public class NeuralNetwork
                 {
                     layer.UpdateParameters(learningRate);
                 }
-                if(count % 1000 == 999)
+                if (count % 1000 == 999)
                 {
                     Console.Write(".");
                 }
