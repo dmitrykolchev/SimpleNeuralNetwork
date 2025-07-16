@@ -1,11 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Numerics;
-using System.Text;
+﻿// <copyright file="LinearLayer.cs" company="Dmitry Kolchev">
+// Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
+// See LICENSE in the project root for license information
+// </copyright>
 
 namespace NeuralNetwork;
 
-// LinearLayer.cs
+/// <summary>
+/// Linear layer class
+/// </summary>
 public class LinearLayer : Layer
 {
     private Matrix _lastInput = null!;
@@ -39,7 +41,7 @@ public class LinearLayer : Layer
         _biasGradients = (Matrix)outputGradient;
 
         // Градиент для передачи на предыдущий слой: dE/dX = W^T * dE/dY
-        Matrix inputGradient = Matrix.Multiply(Weights, true, (Matrix)outputGradient, false);
+        var inputGradient = Matrix.Multiply(Weights, true, (Matrix)outputGradient, false);
 
         return inputGradient;
     }

@@ -1,16 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿// <copyright file="MeanSquaredError.cs" company="Dmitry Kolchev">
+// Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
+// See LICENSE in the project root for license information
+// </copyright>
 
 namespace NeuralNetwork;
-// MeanSquaredError.cs
+
+/// <summary>
+/// Mean Square Error Loss Function
+/// </summary>
 public class MeanSquaredError : ILossFunction
 {
     public float Calculate(Matrix predicted, Matrix actual)
     {
-        Matrix diff = predicted - actual;
+        var diff = predicted - actual;
         float sum = 0;
-        for (int i = 0; i < diff.Rows; i++)
+        for (var i = 0; i < diff.Rows; i++)
         {
             sum += MathF.Pow(diff[i, 0], 2f);
         }

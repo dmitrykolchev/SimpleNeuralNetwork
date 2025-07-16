@@ -1,5 +1,13 @@
-﻿namespace NeuralNetwork;
-// NeuralNetwork.cs
+﻿// <copyright file="NeuralNetwork.cs" company="Dmitry Kolchev">
+// Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
+// See LICENSE in the project root for license information
+// </copyright>
+
+namespace NeuralNetwork;
+
+/// <summary>
+/// Neural network class
+/// </summary>
 public class NeuralNetwork
 {
     private readonly List<Layer> _layers = new();
@@ -22,7 +30,7 @@ public class NeuralNetwork
 
     public object Predict(object input)
     {
-        object output = input;
+        var output = input;
         foreach (var layer in _layers)
         {
             output = layer.Forward(output);
@@ -33,25 +41,27 @@ public class NeuralNetwork
     public void Train(List<(object input, Matrix target)> trainingData, int epochs, float learningRate)
     {
         if (_lossFunction == null)
+        {
             throw new InvalidOperationException("Loss function must be set before training.");
+        }
 
-        for (int i = 0; i < epochs; i++)
+        for (var i = 0; i < epochs; i++)
         {
             float totalLoss = 0;
             // Перемешиваем данные для стохастичности
             trainingData = trainingData.OrderBy(x => Guid.NewGuid()).ToList();
-            int count = 0;
+            var count = 0;
             foreach (var (input, target) in trainingData)
             {
                 // 1. Forward pass
-                object output = Predict(input);
+                var output = Predict(input);
 
                 // 2. Calculate loss and its derivative
                 totalLoss += _lossFunction.Calculate((Matrix)output, (Matrix)target);
                 object gradient = _lossFunction.CalculateDerivative((Matrix)output, (Matrix)target);
 
                 // 3. Backward pass
-                for (int j = _layers.Count - 1; j >= 0; j--)
+                for (var j = _layers.Count - 1; j >= 0; j--)
                 {
                     gradient = _layers[j].Backward(gradient);
                 }

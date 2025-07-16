@@ -1,9 +1,13 @@
-﻿namespace NeuralNetwork;
+﻿// <copyright file="Program.cs" company="Dmitry Kolchev">
+// Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
+// See LICENSE in the project root for license information
+// </copyright>
 
-// Program.cs
-class Program
+namespace NeuralNetwork;
+
+internal static class Program
 {
-    static void Main(string[] args)
+    static void Main()
     {
         // ВАЖНО: убедитесь, что все классы слоев обновлены для работы с `object`
 
@@ -38,7 +42,7 @@ class Program
         network.AddLayer(new FlattenLayer()); // Выход: Matrix (256x1)
 
         network.AddLayer(new LinearLayer(
-            inputSize: 7 * 7 * 16, 
+            inputSize: 7 * 7 * 16,
             outputSize: 120));
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
 
@@ -65,7 +69,7 @@ class Program
         Console.WriteLine("Training complete.");
 
         // Тестируем сеть
-        int correctPredictions = 0;
+        var correctPredictions = 0;
         // Возьмем подмножество для тестирования, чтобы было быстрее
         var cnnTestData = testData.Take(1000).ToList();
 
@@ -73,14 +77,14 @@ class Program
         {
             var inputTensor = SimpleTensor.FromMatrix(inputMatrix, 28, 28, 1);
             // Убедимся, что Predict в NeuralNetwork также работает с object
-            Matrix prediction = (Matrix)network.Predict(inputTensor);
+            var prediction = (Matrix)network.Predict(inputTensor);
             if (prediction.GetPredictedClass() == target.GetPredictedClass())
             {
                 correctPredictions++;
             }
         }
 
-        float accuracy = (float)correctPredictions / cnnTestData.Count;
+        var accuracy = (float)correctPredictions / cnnTestData.Count;
         Console.WriteLine($"Test Accuracy on 1000 samples: {accuracy:P2}");
     }
 }

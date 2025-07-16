@@ -1,4 +1,9 @@
-﻿using System.Numerics.Tensors;
+﻿// <copyright file="ConvolutionalLayer.cs" company="Dmitry Kolchev">
+// Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
+// See LICENSE in the project root for license information
+// </copyright>
+
+using System.Numerics.Tensors;
 
 namespace NeuralNetwork;
 
@@ -14,7 +19,9 @@ public enum PaddingType
     Same
 }
 
-
+/// <summary>
+/// Convolutional layer class
+/// </summary>
 public sealed unsafe class ConvolutionalLayer : Layer
 {
     private readonly int _filterCount;
@@ -53,7 +60,7 @@ public sealed unsafe class ConvolutionalLayer : Layer
         Filters = new List<SimpleTensor>();
         Biases = new float[filterCount];
 
-        for (int i = 0; i < filterCount; i++)
+        for (var i = 0; i < filterCount; i++)
         {
             var filter = new SimpleTensor(filterSize, filterSize, inputDepth);
             filter.Randomize(fanIn: filterSize * filterSize * inputDepth);
@@ -71,8 +78,8 @@ public sealed unsafe class ConvolutionalLayer : Layer
         _lastInput = (SimpleTensor)input;
 
         // Формула выхода с учетом паддинга: W_out = (W_in - F + 2P) / S + 1
-        int outputHeight = (_lastInput.Height - _filterSize + 2 * _padding) / _stride + 1;
-        int outputWidth = (_lastInput.Width - _filterSize + 2 * _padding) / _stride + 1;
+        var outputHeight = (_lastInput.Height - _filterSize + 2 * _padding) / _stride + 1;
+        var outputWidth = (_lastInput.Width - _filterSize + 2 * _padding) / _stride + 1;
 
         var output = new SimpleTensor(outputWidth, outputHeight, _filterCount);
 
@@ -80,28 +87,28 @@ public sealed unsafe class ConvolutionalLayer : Layer
         Parallel.For(0, _filterCount, f =>
         {
             var filterData = Filters[f]._data;
-            for (int y_out = 0; y_out < outputHeight; y_out++)
+            for (var y_out = 0; y_out < outputHeight; y_out++)
             {
-                for (int x_out = 0; x_out < outputWidth; x_out++)
+                for (var x_out = 0; x_out < outputWidth; x_out++)
                 {
                     float sum = 0;
                     // Итерация по окну свертки
-                    for (int fy = 0; fy < _filterSize; fy++)
+                    for (var fy = 0; fy < _filterSize; fy++)
                     {
-                        for (int fx = 0; fx < _filterSize; fx++)
+                        for (var fx = 0; fx < _filterSize; fx++)
                         {
                             // Рассчитываем координаты в исходном тензоре
-                            int inputY = y_out * _stride + fy - _padding;
-                            int inputX = x_out * _stride + fx - _padding;
+                            var inputY = y_out * _stride + fy - _padding;
+                            var inputX = x_out * _stride + fx - _padding;
 
                             // Логический паддинг: проверяем, находимся ли мы в границах исходного изображения
                             if (inputY >= 0 && inputY < _lastInput.Height && inputX >= 0 && inputX < _lastInput.Width)
                             {
                                 // Итерация по глубине (каналам)
-                                for (int d = 0; d < _lastInput.Depth; d++)
+                                for (var d = 0; d < _lastInput.Depth; d++)
                                 {
-                                    float inputValue = _lastInput[inputX, inputY, d];
-                                    float filterValue = filterData[(fy * _filterSize + fx) * _lastInput.Depth + d];
+                                    var inputValue = _lastInput[inputX, inputY, d];
+                                    var filterValue = filterData[(fy * _filterSize + fx) * _lastInput.Depth + d];
                                     sum += inputValue * filterValue;
                                 }
                             }
@@ -121,7 +128,7 @@ public sealed unsafe class ConvolutionalLayer : Layer
         var inputGradient = new SimpleTensor(_lastInput.Width, _lastInput.Height, _lastInput.Depth);
 
         _filterGradients = new List<SimpleTensor>();
-        for (int i = 0; i < _filterCount; i++)
+        for (var i = 0; i < _filterCount; i++)
         {
             var gradTensor = new SimpleTensor(_filterSize, _filterSize, _lastInput.Depth);
             _filterGradients.Add(gradTensor);
@@ -134,23 +141,23 @@ public sealed unsafe class ConvolutionalLayer : Layer
             var filterData = Filters[f]._data;
             var filterGradData = _filterGradients[f]._data;
 
-            for (int y_out = 0; y_out < outputGradient.Height; y_out++)
+            for (var y_out = 0; y_out < outputGradient.Height; y_out++)
             {
-                for (int x_out = 0; x_out < outputGradient.Width; x_out++)
+                for (var x_out = 0; x_out < outputGradient.Width; x_out++)
                 {
-                    float grad = outputGradient[x_out, y_out, f];
+                    var grad = outputGradient[x_out, y_out, f];
                     _biasGradients[f] += grad;
 
-                    for (int fy = 0; fy < _filterSize; fy++)
+                    for (var fy = 0; fy < _filterSize; fy++)
                     {
-                        for (int fx = 0; fx < _filterSize; fx++)
+                        for (var fx = 0; fx < _filterSize; fx++)
                         {
-                            int inputY = y_out * _stride + fy - _padding;
-                            int inputX = x_out * _stride + fx - _padding;
+                            var inputY = y_out * _stride + fy - _padding;
+                            var inputX = x_out * _stride + fx - _padding;
 
                             if (inputY >= 0 && inputY < _lastInput.Height && inputX >= 0 && inputX < _lastInput.Width)
                             {
-                                for (int d = 0; d < _lastInput.Depth; d++)
+                                for (var d = 0; d < _lastInput.Depth; d++)
                                 {
                                     // Обновляем градиент для фильтра
                                     filterGradData[(fy * _filterSize + fx) * _lastInput.Depth + d] += _lastInput[inputX, inputY, d] * grad;
@@ -168,13 +175,13 @@ public sealed unsafe class ConvolutionalLayer : Layer
 
     public override void UpdateParameters(float learningRate)
     {
-        float lr = (float)learningRate;
-        for (int f = 0; f < _filterCount; f++)
+        var lr = (float)learningRate;
+        for (var f = 0; f < _filterCount; f++)
         {
             // Обновляем веса фильтров
             var filterData = Filters[f]._data;
             var filterGradData = _filterGradients[f]._data;
-            int size = Filters[f].Size;
+            var size = Filters[f].Size;
             TensorPrimitives.MultiplyAdd(filterGradData, -lr, filterData, filterData);
         }
         // Обновляем смещения

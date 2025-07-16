@@ -1,11 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace NeuralNetwork;
-// MnistLoader.cs
+﻿// <copyright file="MnistLoader.cs" company="Dmitry Kolchev">
+// Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
+// See LICENSE in the project root for license information
+// </copyright>
 using System.IO;
 
+namespace NeuralNetwork;
+
+/// <summary>
+/// Loader for MNIST dataset
+/// </summary>
 public static class MnistLoader
 {
     public static List<(Matrix, Matrix)> LoadData(string imageFile, string labelFile)
@@ -19,32 +22,34 @@ public static class MnistLoader
 
         // Пропускаем заголовки
         imageReader.ReadInt32(); // magic number
-        int numImages = SwapEndianness(imageReader.ReadInt32());
-        int rows = SwapEndianness(imageReader.ReadInt32());
-        int cols = SwapEndianness(imageReader.ReadInt32());
+        var numImages = SwapEndianness(imageReader.ReadInt32());
+        var rows = SwapEndianness(imageReader.ReadInt32());
+        var cols = SwapEndianness(imageReader.ReadInt32());
 
         labelReader.ReadInt32(); // magic number
-        int numLabels = SwapEndianness(labelReader.ReadInt32());
+        var numLabels = SwapEndianness(labelReader.ReadInt32());
 
         if (numImages != numLabels)
+        {
             throw new IOException("Image and label file counts do not match.");
+        }
 
-        for (int i = 0; i < numImages; i++)
+        for (var i = 0; i < numImages; i++)
         {
             // Читаем изображение
             var pixels = new float[rows * cols];
-            for (int j = 0; j < rows * cols; j++)
+            for (var j = 0; j < rows * cols; j++)
             {
                 // Нормализуем пиксели от 0-255 до 0-1
                 pixels[j] = imageReader.ReadByte() / 255.0f;
             }
-            Matrix input = Matrix.CreateVector(pixels);
+            var input = Matrix.CreateVector(pixels);
 
             // Читаем метку и преобразуем в one-hot вектор
-            byte label = labelReader.ReadByte();
+            var label = labelReader.ReadByte();
             var targetData = new float[10];
             targetData[label] = 1.0f;
-            Matrix target = Matrix.CreateVector(targetData);
+            var target = Matrix.CreateVector(targetData);
 
             data.Add((input, target));
         }

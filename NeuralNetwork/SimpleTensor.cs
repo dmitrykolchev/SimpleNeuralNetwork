@@ -1,4 +1,9 @@
-﻿using System.Diagnostics;
+﻿// <copyright file="SimpleTensor.cs" company="Dmitry Kolchev">
+// Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
+// See LICENSE in the project root for license information
+// </copyright>
+
+using System.Diagnostics;
 using System.Numerics.Tensors;
 using System.Runtime.CompilerServices;
 
@@ -14,13 +19,13 @@ public sealed unsafe class SimpleTensor : IDisposable
 {
     // Сделан internal для эффективного взаимодействия с другими unsafe классами (Matrix).
     internal readonly float[] _data = null!;
-    private bool _disposed = false;
+    private bool _disposed;
 
     public SimpleTensor(int width, int height, int depth)
     {
         if (width < 0 || height < 0 || depth < 0)
         {
-            throw new ArgumentOutOfRangeException("Tensor dimensions cannot be negative.");
+            throw new ArgumentException("Tensor dimensions cannot be negative.");
         }
 
         Width = width;
@@ -56,15 +61,6 @@ public sealed unsafe class SimpleTensor : IDisposable
 #endif
             return ref _data[(h * Width + w) * Depth + d];
         }
-        //        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //        set
-        //        {
-        //#if DEBUG
-        //            if (w < 0 || w >= Width || h < 0 || h >= Height || d < 0 || d >= Depth)
-        //                throw new IndexOutOfRangeException();
-        //#endif
-        //            _data[(h * Width + w) * Depth + d] = value;
-        //        }
     }
 
     /// <summary>
@@ -86,7 +82,9 @@ public sealed unsafe class SimpleTensor : IDisposable
     public static SimpleTensor FromMatrix(Matrix matrix, int width, int height, int depth)
     {
         if (matrix.Size != width * height * depth)
+        {
             throw new ArgumentException("Matrix size does not match target tensor dimensions.");
+        }
 
         var tensor = new SimpleTensor(width, height, depth);
         if (tensor._data != null)
@@ -102,9 +100,13 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// </summary>
     public void Randomize(int fanIn)
     {
-        if (_data == null) return;
+        if (_data == null)
+        {
+            return;
+        }
+
         var scale = MathF.Sqrt(1.0f / fanIn);
-        for (int i = 0; i < Size; i++)
+        for (var i = 0; i < Size; i++)
         {
             _data[i] = (Random.Shared.NextSingle() * 2f - 1f) * scale;
         }
@@ -118,7 +120,11 @@ public sealed unsafe class SimpleTensor : IDisposable
     public SimpleTensor Map(Action<ReadOnlySpan<float>, Span<float>> func)
     {
         var result = new SimpleTensor(Width, Height, Depth);
-        if (_data == null) return result;
+        if (_data == null)
+        {
+            return result;
+        }
+
         func(_data, result._data);
         return result;
     }
@@ -130,10 +136,15 @@ public sealed unsafe class SimpleTensor : IDisposable
     public static SimpleTensor Hadamard(SimpleTensor a, SimpleTensor b)
     {
         if (a.Width != b.Width || a.Height != b.Height || a.Depth != b.Depth)
+        {
             throw new ArgumentException("Tensors must have same dimensions for Hadamard product.");
+        }
 
         var result = new SimpleTensor(a.Width, a.Height, a.Depth);
-        if (result._data == null) return result;
+        if (result._data == null)
+        {
+            return result;
+        }
 
         TensorPrimitives.Multiply(a._data, b._data, result._data);
         return result;
@@ -142,7 +153,10 @@ public sealed unsafe class SimpleTensor : IDisposable
     public static void Hadamard(SimpleTensor a, SimpleTensor b, SimpleTensor result)
     {
         if (a.Width != b.Width || a.Height != b.Height || a.Depth != b.Depth)
+        {
             throw new ArgumentException("Tensors must have same dimensions for Hadamard product.");
+        }
+
         TensorPrimitives.Multiply(a._data, b._data, result._data);
     }
 
@@ -152,7 +166,7 @@ public sealed unsafe class SimpleTensor : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private void Dispose(bool disposing)
+    private void Dispose(bool _)
     {
         if (!_disposed)
         {
