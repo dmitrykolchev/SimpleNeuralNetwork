@@ -18,18 +18,18 @@ class Program
         // Архитектура CNN (похожая на LeNet)
         // Вход: 28x28x1
         network.AddLayer(new ConvolutionalLayer(
-            filterCount: 6, 
-            filterSize: 5, 
-            stride: 1, 
+            filterCount: 6,
+            filterSize: 5,
+            stride: 1,
             inputDepth: 1,
             paddingType: PaddingType.Same)); // Выход: 24x24x6
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
         network.AddLayer(new MaxPoolingLayer(poolSize: 2, stride: 2)); // Выход: 12x12x6
 
         network.AddLayer(new ConvolutionalLayer(
-            filterCount: 16, 
-            filterSize: 5, 
-            stride: 1, 
+            filterCount: 16,
+            filterSize: 5,
+            stride: 1,
             inputDepth: 6,
             paddingType: PaddingType.Same)); // Выход: 8x8x16
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));

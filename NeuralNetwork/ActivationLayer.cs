@@ -3,7 +3,7 @@
 namespace NeuralNetwork;
 // ActivationLayer.cs
 // ActivationLayer.cs
-public class ActivationLayer : ILayer
+public class ActivationLayer : Layer
 {
     // ... (конструктор тот же)
     private readonly Action<ReadOnlySpan<float>, Span<float>> _activation;

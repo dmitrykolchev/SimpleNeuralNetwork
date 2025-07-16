@@ -73,7 +73,7 @@ public sealed unsafe class SimpleTensor : IDisposable
     public Matrix ToMatrix()
     {
         var matrix = new Matrix(Size, 1);
-        if (this._data != null)
+        if (_data != null)
         {
             Array.Copy(_data, 0, matrix._data, 0, matrix.Size);
         }

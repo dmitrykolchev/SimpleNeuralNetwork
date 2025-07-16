@@ -2,7 +2,7 @@
 // NeuralNetwork.cs
 public class NeuralNetwork
 {
-    private readonly List<ILayer> _layers = new();
+    private readonly List<Layer> _layers = new();
     private ILossFunction _lossFunction;
 
     public NeuralNetwork(ILossFunction lossFunction)
@@ -10,7 +10,7 @@ public class NeuralNetwork
         _lossFunction = lossFunction;
     }
 
-    public void AddLayer(ILayer layer)
+    public void AddLayer(Layer layer)
     {
         _layers.Add(layer);
     }

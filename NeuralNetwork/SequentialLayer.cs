@@ -1,11 +1,11 @@
 ﻿namespace NeuralNetwork;
 // CompositeLayer.cs
 
-public class SequentialLayer : ILayer
+public class SequentialLayer : Layer
 {
-    private readonly List<ILayer> _layers = new List<ILayer>();
+    private readonly List<Layer> _layers = new List<Layer>();
 
-    public void AddLayer(ILayer layer)
+    public void AddLayer(Layer layer)
     {
         _layers.Add(layer);
     }

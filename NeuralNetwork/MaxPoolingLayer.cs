@@ -1,6 +1,6 @@
 ﻿namespace NeuralNetwork;
 // MaxPoolingLayer.cs
-public class MaxPoolingLayer : ILayer
+public class MaxPoolingLayer : Layer
 {
     private readonly int _poolSize;
     private readonly int _stride;

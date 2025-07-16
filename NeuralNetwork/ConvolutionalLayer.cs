@@ -15,7 +15,7 @@ public enum PaddingType
 }
 
 
-public sealed unsafe class ConvolutionalLayer : ILayer
+public sealed unsafe class ConvolutionalLayer : Layer
 {
     private readonly int _filterCount;
     private readonly int _filterSize;
@@ -76,8 +76,8 @@ public sealed unsafe class ConvolutionalLayer : ILayer
 
         var output = new SimpleTensor(outputWidth, outputHeight, _filterCount);
 
-        // Обнуляем выходной тензор
-        for (int f = 0; f < _filterCount; f++) // Для каждого фильтра
+        //for (int f = 0; f < _filterCount; f++) // Для каждого фильтра
+        Parallel.For(0, _filterCount, f =>
         {
             var filterData = Filters[f]._data;
             for (int y_out = 0; y_out < outputHeight; y_out++)
@@ -111,7 +111,7 @@ public sealed unsafe class ConvolutionalLayer : ILayer
                     output[x_out, y_out, f] = sum + Biases[f];
                 }
             }
-        }
+        });
         return output;
     }
 
@@ -128,7 +128,8 @@ public sealed unsafe class ConvolutionalLayer : ILayer
         }
         _biasGradients = new float[_filterCount];
 
-        for (int f = 0; f < _filterCount; f++)
+        //for (int f = 0; f < _filterCount; f++)
+        Parallel.For(0, _filterCount, f =>
         {
             var filterData = Filters[f]._data;
             var filterGradData = _filterGradients[f]._data;
@@ -161,7 +162,7 @@ public sealed unsafe class ConvolutionalLayer : ILayer
                     }
                 }
             }
-        }
+        });
         return inputGradient;
     }
 

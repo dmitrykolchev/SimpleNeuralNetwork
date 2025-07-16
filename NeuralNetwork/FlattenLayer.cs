@@ -1,6 +1,6 @@
 ﻿namespace NeuralNetwork;
 // FlattenLayer.cs
-public class FlattenLayer : ILayer
+public class FlattenLayer : Layer
 {
     private int _lastInputWidth, _lastInputHeight, _lastInputDepth;
 

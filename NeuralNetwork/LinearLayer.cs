@@ -6,7 +6,7 @@ using System.Text;
 namespace NeuralNetwork;
 
 // LinearLayer.cs
-public class LinearLayer : ILayer
+public class LinearLayer : Layer
 {
     private Matrix _lastInput = null!;
     private Matrix _weightGradients = null!;
