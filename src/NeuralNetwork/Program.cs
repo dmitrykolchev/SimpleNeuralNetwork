@@ -1,4 +1,4 @@
-﻿// <copyright file="Program.cs" company="Dmitry Kolchev">
+// <copyright file="Program.cs" company="Dmitry Kolchev">
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
@@ -13,8 +13,8 @@ internal static class Program
 
         Console.WriteLine("Loading MNIST data...");
         // Загружаем данные как обычно
-        var trainingData = MnistLoader.LoadData("../../../../mnist-data/train-images.idx3-ubyte", "../../../../mnist-data/train-labels.idx1-ubyte");
-        var testData = MnistLoader.LoadData("../../../../mnist-data/t10k-images.idx3-ubyte", "../../../../mnist-data/t10k-labels.idx1-ubyte");
+        var trainingData = MnistLoader.LoadData("../../../../../mnist-data/train-images.idx3-ubyte", "../../../../../mnist-data/train-labels.idx1-ubyte");
+        var testData = MnistLoader.LoadData("../../../../../mnist-data/t10k-images.idx3-ubyte", "../../../../../mnist-data/t10k-labels.idx1-ubyte");
         Console.WriteLine("Data loaded.");
 
         var network = new NeuralNetwork(new MeanSquaredError());
