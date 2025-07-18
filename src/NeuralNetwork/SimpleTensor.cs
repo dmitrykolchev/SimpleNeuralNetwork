@@ -1,4 +1,4 @@
-﻿// <copyright file="SimpleTensor.cs" company="Dmitry Kolchev">
+// <copyright file="SimpleTensor.cs" company="Dmitry Kolchev">
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
@@ -23,7 +23,7 @@ public sealed unsafe class SimpleTensor : IDisposable
 
     public SimpleTensor(int width, int height, int depth)
     {
-        if (width < 0 || height < 0 || depth < 0)
+        if (width <= 0 || height <= 0 || depth <= 0)
         {
             throw new ArgumentException("Tensor dimensions cannot be negative.");
         }
@@ -32,12 +32,6 @@ public sealed unsafe class SimpleTensor : IDisposable
         Height = height;
         Depth = depth;
         Size = width * height * depth;
-
-        if (Size == 0)
-        {
-            return;
-        }
-
         _data = new float[Size];
     }
 
@@ -46,6 +40,14 @@ public sealed unsafe class SimpleTensor : IDisposable
     public readonly int Depth;
     public readonly int Size;
 
+    public Span<float> this[int w, int h]
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
+        {
+            return _data.AsSpan((h * Width + w) * Depth, Depth);
+        }
+    }
     /// <summary>
     /// Индексатор для доступа к элементам тензора. В debug-сборке выполняет проверку границ.
     /// Память организована в формате HWC (Height-Width-Channel).
@@ -68,12 +70,12 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// </summary>
     public Matrix ToMatrix()
     {
-        var matrix = new Matrix(Size, 1);
-        if (_data != null)
-        {
-            Array.Copy(_data, 0, matrix._data, 0, matrix.Size);
-        }
-        return matrix;
+        return Matrix.CreateVector(AsSpan());
+    }
+
+    public Span<float> AsSpan()
+    {
+        return new Span<float>(_data, 0, Size);
     }
 
     /// <summary>
@@ -81,16 +83,26 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// </summary>
     public static SimpleTensor FromMatrix(Matrix matrix, int width, int height, int depth)
     {
-        if (matrix.Size != width * height * depth)
+        if (matrix.Rows * matrix.Cols != width * height * depth)
         {
             throw new ArgumentException("Matrix size does not match target tensor dimensions.");
         }
 
         var tensor = new SimpleTensor(width, height, depth);
-        if (tensor._data != null)
+        if (matrix.Stride == 1)
         {
-            Array.Copy(matrix._data, 0, tensor._data, 0, tensor.Size);
-
+            matrix.AsSpan().CopyTo(tensor.AsSpan());
+        }
+        else
+        {
+            var dest = tensor._data.AsSpan();
+            var offset = 0;
+            for (var row = 0; row < matrix.Rows; ++row)
+            {
+                var rowData = matrix.GetRow(row);
+                rowData.CopyTo(dest.Slice(offset));
+                offset += matrix.Cols;
+            }
         }
         return tensor;
     }
@@ -100,11 +112,6 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// </summary>
     public void Randomize(int fanIn)
     {
-        if (_data == null)
-        {
-            return;
-        }
-
         var scale = MathF.Sqrt(1.0f / fanIn);
         for (var i = 0; i < Size; i++)
         {
@@ -120,11 +127,6 @@ public sealed unsafe class SimpleTensor : IDisposable
     public SimpleTensor Map(Action<ReadOnlySpan<float>, Span<float>> func)
     {
         var result = new SimpleTensor(Width, Height, Depth);
-        if (_data == null)
-        {
-            return result;
-        }
-
         func(_data, result._data);
         return result;
     }
@@ -135,18 +137,8 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// </summary>
     public static SimpleTensor Hadamard(SimpleTensor a, SimpleTensor b)
     {
-        if (a.Width != b.Width || a.Height != b.Height || a.Depth != b.Depth)
-        {
-            throw new ArgumentException("Tensors must have same dimensions for Hadamard product.");
-        }
-
         var result = new SimpleTensor(a.Width, a.Height, a.Depth);
-        if (result._data == null)
-        {
-            return result;
-        }
-
-        TensorPrimitives.Multiply(a._data, b._data, result._data);
+        Hadamard(a, b, result);
         return result;
     }
 
@@ -156,7 +148,6 @@ public sealed unsafe class SimpleTensor : IDisposable
         {
             throw new ArgumentException("Tensors must have same dimensions for Hadamard product.");
         }
-
         TensorPrimitives.Multiply(a._data, b._data, result._data);
     }
 

@@ -1,4 +1,4 @@
-﻿// <copyright file="LinearLayer.cs" company="Dmitry Kolchev">
+// <copyright file="LinearLayer.cs" company="Dmitry Kolchev">
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
@@ -16,10 +16,8 @@ public class LinearLayer : Layer
 
     public LinearLayer(int inputSize, int outputSize)
     {
-        Weights = new Matrix(outputSize, inputSize);
-        Biases = new Matrix(outputSize, 1);
-        Weights.Randomize();
-        Biases.Randomize();
+        Weights = Matrix.CreateRandom(outputSize, inputSize);
+        Biases = Matrix.CreateRandom(outputSize, 1);
     }
 
     public Matrix Weights { get; private set; }
@@ -29,26 +27,29 @@ public class LinearLayer : Layer
     public override object Forward(object input)
     {
         _lastInput = (Matrix)input;
-        return Matrix.Multiply(Weights, false, (Matrix)input, false) + Biases;
+        using var temp = Matrix.Multiply(Weights, false, (Matrix)input, false);
+        return Matrix.Add(temp, Biases);
     }
 
     public override object Backward(object outputGradient)
     {
+        //_weightGradients?.Dispose();
         // Градиент для весов: dE/dW = dE/dY * X^T
         _weightGradients = Matrix.Multiply((Matrix)outputGradient, false, _lastInput, true);
 
+        //_biasGradients?.Dispose();
         // Градиент для смещений: dE/dB = dE/dY
         _biasGradients = (Matrix)outputGradient;
 
         // Градиент для передачи на предыдущий слой: dE/dX = W^T * dE/dY
-        var inputGradient = Matrix.Multiply(Weights, true, (Matrix)outputGradient, false);
-
-        return inputGradient;
+        return Matrix.Multiply(Weights, true, (Matrix)outputGradient, false);
     }
 
     public override void UpdateParameters(float learningRate)
     {
-        Weights -= (_weightGradients * learningRate);
-        Biases -= (_biasGradients * learningRate);
+        using var w = Matrix.Multiply(_weightGradients, learningRate);
+        Matrix.SubtractI(Weights, w);
+        using var b = Matrix.Multiply(_biasGradients, learningRate);
+        Matrix.SubtractI(Biases, b);
     }
 }

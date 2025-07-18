@@ -1,0 +1,333 @@
+// <copyright file="MatrixImpl.cs" company="Dmitry Kolchev">
+// Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
+// See LICENSE in the project root for license information
+// </copyright>
+
+using System.Diagnostics;
+using System.Numerics.Tensors;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
+namespace NeuralNetwork;
+
+[DebuggerDisplay("(r:{Rows}, c:{Cols})")]
+public unsafe class Matrix : IDisposable
+{
+    private const int AlignmentBytes = 256 / 8;
+    private const int AlignmentFloats = AlignmentBytes / sizeof(float);
+
+    private readonly int _dataLength;
+    private readonly int _stride;
+    private readonly int _rows;
+    private readonly int _cols;
+
+    private float* _data;
+    private bool _disposed;
+
+    private Matrix(int rows, int cols)
+    {
+        _rows = rows;
+        _cols = cols;
+        _stride = cols == 1
+            ? 1
+            : (cols + AlignmentFloats - 1) & ~(AlignmentFloats - 1);
+        _dataLength = _stride * _rows;
+        _data = (float*)NativeMemory.AlignedAlloc((nuint)_dataLength * sizeof(float), AlignmentBytes);
+    }
+
+    public static Matrix CreateVector(ReadOnlySpan<float> data)
+    {
+        var c = new Matrix(data.Length, 1);
+        data.CopyTo(c.AsSpan());
+        return c;
+    }
+
+    public static Matrix CreateZeros(int rows, int cols)
+    {
+        var c = new Matrix(rows, cols);
+        for (var row = 0; row < c.Rows; row++)
+        {
+            c.GetRow(row).Clear();
+        }
+        return c;
+    }
+
+    public static Matrix CreateOnes(int rows, int cols)
+    {
+        var c = new Matrix(rows, cols);
+        for (var row = 0; row < c.Rows; row++)
+        {
+            c.GetRow(row).Fill(1f);
+        }
+        return c;
+    }
+
+    public static Matrix CreateIdentity(int rows, int cols)
+    {
+        if (rows != cols)
+        {
+            throw new ArgumentException("rows != cols");
+        }
+        var c = new Matrix(rows, cols);
+        for (var row = 0; row < c.Rows; row++)
+        {
+            var rowC = c.GetRow(row);
+            rowC.Clear();
+            rowC[row] = 1f;
+        }
+        return c;
+    }
+
+    public static Matrix CreateRandom(int rows, int cols)
+    {
+        var c = new Matrix(rows, cols);
+        c.Randomize();
+        return c;
+    }
+
+    public int Rows => _rows;
+
+    public int Cols => _cols;
+
+    public int Stride => _stride;
+
+    internal float* Data => _data;
+
+    public ref float this[int row, int col] => ref _data[row * _stride + col];
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Span<float> AsSpan()
+    {
+        return new Span<float>(_data, _dataLength);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Span<float> GetRow(int row)
+    {
+        return new Span<float>(_data + row * _stride, Cols);
+    }
+
+    public static Matrix Add(Matrix a, Matrix b)
+    {
+        var c = new Matrix(rows: a.Rows, cols: a.Cols);
+        for (var row = 0; row < c.Rows; row++)
+        {
+            var rowA = a.GetRow(row);
+            var rowB = b.GetRow(row);
+            var rowC = c.GetRow(row);
+            TensorPrimitives.Add(rowA, rowB, rowC);
+        }
+        return c;
+    }
+
+    public static void AddI(Matrix a, Matrix b)
+    {
+        for (var row = 0; row < a.Rows; row++)
+        {
+            var rowA = a.GetRow(row);
+            var rowB = b.GetRow(row);
+            TensorPrimitives.Add(rowA, rowB, rowA);
+        }
+    }
+
+    public static Matrix Subtract(Matrix a, Matrix b)
+    {
+        var c = new Matrix(rows: a.Rows, cols: a.Cols);
+        for (var row = 0; row < c.Rows; row++)
+        {
+            var rowA = a.GetRow(row);
+            var rowB = b.GetRow(row);
+            var rowC = c.GetRow(row);
+            TensorPrimitives.Subtract(rowA, rowB, rowC);
+        }
+        return c;
+    }
+
+    public static void SubtractI(Matrix a, Matrix b)
+    {
+        for (var row = 0; row < a.Rows; row++)
+        {
+            var rowA = a.GetRow(row);
+            var rowB = b.GetRow(row);
+            TensorPrimitives.Subtract(rowA, rowB, rowA);
+        }
+    }
+
+    public static Matrix Multiply(Matrix a, float alpha)
+    {
+        var c = new Matrix(rows: a.Rows, cols: a.Cols);
+        if (a.Stride == 1 && c.Stride == 1)
+        {
+            TensorPrimitives.Multiply(a.AsSpan(), alpha, c.AsSpan());
+        }
+        else
+        {
+            for (var row = 0; row < c.Rows; row++)
+            {
+                var rowA = a.GetRow(row);
+                var rowC = c.GetRow(row);
+                TensorPrimitives.Multiply(rowA, alpha, rowC);
+            }
+        }
+        return c;
+    }
+
+    public static Matrix Multiply(Matrix a, bool transposeA, Matrix b, bool transposeB)
+    {
+        var aRows = transposeA ? a.Cols : a.Rows;
+        var aCols = transposeA ? a.Rows : a.Cols;
+        var bRows = transposeB ? b.Cols : b.Rows;
+        var bCols = transposeB ? b.Rows : b.Cols;
+
+        if (aCols != bRows)
+        {
+            throw new ArgumentException("Non compatible matrix size");
+        }
+
+        a = transposeA ? Transpose(a) : a;
+        b = transposeB ? b : Transpose(b);
+
+        var c = new Matrix(rows: aRows, cols: bCols);
+        for (int row = 0, rows = c.Rows; row < rows; row++)
+        {
+            var rowA = a.GetRow(row);
+            var rowC = c.GetRow(row);
+            for (int col = 0, cols = c.Cols; col < cols; col++)
+            {
+                var rowB = b.GetRow(col);
+                rowC[col] = TensorPrimitives.Dot(rowA, rowB);
+            }
+        }
+        if (transposeA)
+        {
+            a.Dispose();
+        }
+        if (!transposeB)
+        {
+            b.Dispose();
+        }
+        return c;
+    }
+
+    public static Matrix Hadamard(Matrix a, Matrix b)
+    {
+        if (a.Rows != b.Rows || a.Cols != b.Cols)
+        {
+            throw new ArgumentException("Matrices must have the same dimensions for Hadamard product.");
+        }
+
+        var c = new Matrix(a.Rows, a.Cols);
+        if (a.Stride == 1 && b.Stride == 1)
+        {
+            TensorPrimitives.Multiply(a.AsSpan(), b.AsSpan(), c.AsSpan());
+        }
+        else
+        {
+            for (var row = 0; row < a.Rows; row++)
+            {
+                var rowA = a.GetRow(row);
+                var rowB = b.GetRow(row);
+                var rowC = c.GetRow(row);
+                TensorPrimitives.Multiply(rowA, rowB, rowC);
+            }
+        }
+        return c;
+    }
+
+    public static Matrix Transpose(Matrix a)
+    {
+        var c = new Matrix(a.Cols, a.Rows);
+        if (a.Cols == 1 || a.Rows == 1)
+        {
+            a.AsSpan().CopyTo(c.AsSpan());
+        }
+        else
+        {
+            var cSpan = c.AsSpan();
+            for (var row = 0; row < a.Rows; row++)
+            {
+                var rowData = a.GetRow(row);
+                for (int col = 0, offDst = row; col < a.Cols; col++, offDst += c.Stride)
+                {
+                    cSpan[offDst] = rowData[col];
+                }
+            }
+        }
+        return c;
+    }
+
+    public void Randomize()
+    {
+        var rand = Random.Shared;
+        var scale = MathF.Sqrt(1.0f / Rows);
+        for (var row = 0; row < Rows; row++)
+        {
+            var rowData = GetRow(row);
+            for (var col = 0; col < Cols; col++)
+            {
+                rowData[col] = (rand.NextSingle() * 2f - 1f) * scale;
+            }
+        }
+    }
+
+    public Matrix Map(Action<ReadOnlySpan<float>, Span<float>> func)
+    {
+        var c = new Matrix(Rows, Cols);
+        for (var row = 0; row < Rows; row++)
+        {
+            var rowA = GetRow(row);
+            var rowC = c.GetRow(row);
+            func(rowA, rowC);
+        }
+        return c;
+    }
+
+    public (int row, int col) GetMaxIndex()
+    {
+        int maxRow = 0, maxCol = 0;
+        var maxValue = this[0, 0];
+        for (var row = 0; row < Rows; row++)
+        {
+            var rowData = GetRow(row);
+            for (var col = 0; col < Cols; col++)
+            {
+                if (rowData[col] > maxValue)
+                {
+                    maxValue = rowData[col];
+                    maxRow = row; maxCol = col;
+                }
+            }
+        }
+        return (maxRow, maxCol);
+    }
+
+    public int GetPredictedClass()
+    {
+        (var row, var col) = GetMaxIndex();
+        return row * Cols + col;
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool _)
+    {
+        if (!_disposed)
+        {
+            _disposed = true;
+            if (_data != null)
+            {
+                NativeMemory.AlignedFree(_data);
+                _data = null;
+            }
+        }
+    }
+
+    ~Matrix()
+    {
+        Dispose(false);
+    }
+}

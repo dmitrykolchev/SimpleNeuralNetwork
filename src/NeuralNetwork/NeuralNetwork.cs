@@ -1,7 +1,9 @@
-﻿// <copyright file="NeuralNetwork.cs" company="Dmitry Kolchev">
+// <copyright file="NeuralNetwork.cs" company="Dmitry Kolchev">
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
+
+using System.Diagnostics;
 
 namespace NeuralNetwork;
 
@@ -51,6 +53,7 @@ public class NeuralNetwork
             // Перемешиваем данные для стохастичности
             trainingData = trainingData.OrderBy(x => Guid.NewGuid()).ToList();
             var count = 0;
+            var stopwatch = Stopwatch.StartNew();
             foreach (var (input, target) in trainingData)
             {
                 // 1. Forward pass
@@ -73,11 +76,13 @@ public class NeuralNetwork
                 }
                 if (count % 1000 == 999)
                 {
-                    Console.Write(".");
+                    var remainingTime = (double)((trainingData.Count - count) * stopwatch.ElapsedMilliseconds) / count / 1000.0;
+                    var elapsedTime = (double)(stopwatch.ElapsedMilliseconds) / 1000.0;
+                    Console.Write($"\r{count,6}, {(double)stopwatch.ElapsedMilliseconds/count:f2} ms per image, ET: {TimeSpan.FromSeconds(elapsedTime)}, RT: {TimeSpan.FromSeconds(remainingTime)}");
                 }
                 ++count;
             }
-            Console.WriteLine($"Epoch {i + 1}/{epochs}, Loss: {totalLoss / trainingData.Count}");
+            Console.WriteLine($" -> Epoch {i + 1}/{epochs}, Loss: {totalLoss / trainingData.Count}");
         }
     }
 }

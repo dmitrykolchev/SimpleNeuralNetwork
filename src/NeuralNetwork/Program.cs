@@ -9,8 +9,6 @@ internal static class Program
 {
     static void Main()
     {
-        // ВАЖНО: убедитесь, что все классы слоев обновлены для работы с `object`
-
         Console.WriteLine("Loading MNIST data...");
         // Загружаем данные как обычно
         var trainingData = MnistLoader.LoadData("../../../../../mnist-data/train-images.idx3-ubyte", "../../../../../mnist-data/train-labels.idx1-ubyte");

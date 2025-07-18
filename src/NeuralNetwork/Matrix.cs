@@ -1,4 +1,4 @@
-﻿// <copyright file="Matrix.cs" company="Dmitry Kolchev">
+// <copyright file="Matrix.cs" company="Dmitry Kolchev">
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
@@ -16,7 +16,7 @@ namespace NeuralNetwork;
 /// </summary>
 
 [DebuggerDisplay("(r:{Rows}, c:{Cols}), size:{Size}")]
-public sealed unsafe class Matrix : IDisposable
+public sealed unsafe class MatrixOld : IDisposable
 {
     public readonly int Rows;
     public readonly int Cols;
@@ -49,11 +49,11 @@ public sealed unsafe class Matrix : IDisposable
         }
     }
 
-    public Matrix(int rows, int cols)
+    public MatrixOld(int rows, int cols)
     {
         if (rows < 0 || cols < 0)
         {
-            throw new ArgumentException("Matrix dimensions cannot be negative.");
+            throw new ArgumentException("MatrixOld dimensions cannot be negative.");
         }
 
         Rows = rows;
@@ -67,31 +67,9 @@ public sealed unsafe class Matrix : IDisposable
         _data = new float[Size];
     }
 
-    public static Matrix FromArray(float[,] data)
+    public static MatrixOld CreateVector(float[] data)
     {
-        var rows = data.GetLength(0);
-        var cols = data.GetLength(1);
-        var m = new Matrix(rows, cols);
-        if (m._data == null)
-        {
-            return m;
-        }
-
-        var ptr = m._data;
-        var k = 0;
-        for (var i = 0; i < rows; i++)
-        {
-            for (var j = 0; j < cols; j++)
-            {
-                ptr[k++] = data[i, j];
-            }
-        }
-        return m;
-    }
-
-    public static Matrix CreateVector(float[] data)
-    {
-        var m = new Matrix(data.Length, 1);
+        var m = new MatrixOld(data.Length, 1);
         if (m._data == null)
         {
             return m;
@@ -101,14 +79,14 @@ public sealed unsafe class Matrix : IDisposable
         return m;
     }
 
-    public static Matrix operator +(Matrix a, Matrix b)
+    public static MatrixOld operator +(MatrixOld a, MatrixOld b)
     {
         if (a.Rows != b.Rows || a.Cols != b.Cols)
         {
             throw new ArgumentException("Matrices must have same dimensions.");
         }
 
-        var result = new Matrix(a.Rows, a.Cols);
+        var result = new MatrixOld(a.Rows, a.Cols);
         if (result._data == null)
         {
             return result;
@@ -121,14 +99,14 @@ public sealed unsafe class Matrix : IDisposable
         return result;
     }
 
-    public static Matrix operator -(Matrix a, Matrix b)
+    public static MatrixOld operator -(MatrixOld a, MatrixOld b)
     {
         if (a.Rows != b.Rows || a.Cols != b.Cols)
         {
             throw new ArgumentException("Matrices must have same dimensions.");
         }
 
-        var result = new Matrix(a.Rows, a.Cols);
+        var result = new MatrixOld(a.Rows, a.Cols);
         if (result._data == null)
         {
             return result;
@@ -141,9 +119,9 @@ public sealed unsafe class Matrix : IDisposable
         return result;
     }
 
-    public static Matrix operator *(Matrix a, float scalar)
+    public static MatrixOld operator *(MatrixOld a, float scalar)
     {
-        var result = new Matrix(a.Rows, a.Cols);
+        var result = new MatrixOld(a.Rows, a.Cols);
         if (result._data == null)
         {
             return result;
@@ -153,7 +131,7 @@ public sealed unsafe class Matrix : IDisposable
         return result;
     }
 
-    public static Matrix Multiply(Matrix a, bool aTransposed, Matrix b, bool bTransposed)
+    public static MatrixOld Multiply(MatrixOld a, bool aTransposed, MatrixOld b, bool bTransposed)
     {
         if (aTransposed)
         {
@@ -164,7 +142,7 @@ public sealed unsafe class Matrix : IDisposable
             b = Transpose(b);
         }
 
-        var result = new Matrix(a.Rows, b.Rows);
+        var result = new MatrixOld(a.Rows, b.Rows);
         if (result._data == null)
         {
             return result;
@@ -186,14 +164,14 @@ public sealed unsafe class Matrix : IDisposable
     /// <summary>
     /// Выполняет поэлементное умножение матриц (произведение Адамара).
     /// </summary>
-    public static Matrix Hadamard(Matrix a, Matrix b)
+    public static MatrixOld Hadamard(MatrixOld a, MatrixOld b)
     {
         if (a.Rows != b.Rows || a.Cols != b.Cols)
         {
             throw new ArgumentException("Matrices must have the same dimensions for Hadamard product.");
         }
 
-        var result = new Matrix(a.Rows, a.Cols);
+        var result = new MatrixOld(a.Rows, a.Cols);
         if (result._data == null)
         {
             return result;
@@ -208,9 +186,9 @@ public sealed unsafe class Matrix : IDisposable
 
     #region Другие методы
 
-    public static Matrix Transpose(Matrix m)
+    public static MatrixOld Transpose(MatrixOld m)
     {
-        var result = new Matrix(m.Cols, m.Rows);
+        var result = new MatrixOld(m.Cols, m.Rows);
         if (result._data == null)
         {
             return result;
@@ -267,9 +245,9 @@ public sealed unsafe class Matrix : IDisposable
     /// Для стандартных функций активации (ReLU, Sigmoid) следует создавать специализированные
     /// векторизованные методы для максимальной производительности.
     /// </summary>
-    public Matrix Map(Action<ReadOnlySpan<float>, Span<float>> func)
+    public MatrixOld Map(Action<ReadOnlySpan<float>, Span<float>> func)
     {
-        var result = new Matrix(Rows, Cols);
+        var result = new MatrixOld(Rows, Cols);
         if (result._data == null)
         {
             return result;
@@ -289,7 +267,7 @@ public sealed unsafe class Matrix : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private void Dispose(bool disposing)
+    private void Dispose(bool _)
     {
         if (!_disposed)
         {
@@ -297,7 +275,7 @@ public sealed unsafe class Matrix : IDisposable
         }
     }
 
-    ~Matrix()
+    ~MatrixOld()
     {
         Dispose(false);
     }

@@ -12,6 +12,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{02EA681E-C7D
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NeuralNetwork", "src\NeuralNetwork\NeuralNetwork.csproj", "{32477324-D818-5D75-2C3B-07E8376D6B45}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Managed.Mkl", "src\Managed.Mkl\Managed.Mkl.csproj", "{190AB521-A475-58BD-6519-9FA37FB19CF8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -22,12 +24,17 @@ Global
 		{32477324-D818-5D75-2C3B-07E8376D6B45}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{32477324-D818-5D75-2C3B-07E8376D6B45}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{32477324-D818-5D75-2C3B-07E8376D6B45}.Release|Any CPU.Build.0 = Release|Any CPU
+		{190AB521-A475-58BD-6519-9FA37FB19CF8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{190AB521-A475-58BD-6519-9FA37FB19CF8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{190AB521-A475-58BD-6519-9FA37FB19CF8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{190AB521-A475-58BD-6519-9FA37FB19CF8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{32477324-D818-5D75-2C3B-07E8376D6B45} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{190AB521-A475-58BD-6519-9FA37FB19CF8} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {56E0D5C2-5AC5-45C6-A639-D1F0C720A057}
