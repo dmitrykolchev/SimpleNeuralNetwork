@@ -17,6 +17,7 @@ public class NeuralNetwork
 
     public NeuralNetwork(ILossFunction lossFunction)
     {
+        ArgumentNullException.ThrowIfNull(lossFunction);
         _lossFunction = lossFunction;
     }
 

@@ -13,13 +13,8 @@ internal static class Program
 
     static void Main()
     {
-        Console.WriteLine("Loading MNIST data...");
-        // Загружаем данные как обычно
-        _trainingData = MnistLoader.LoadData("../../../../../mnist-data/train-images.idx3-ubyte", "../../../../../mnist-data/train-labels.idx1-ubyte");
-        _testData = MnistLoader.LoadData("../../../../../mnist-data/t10k-images.idx3-ubyte", "../../../../../mnist-data/t10k-labels.idx1-ubyte");
-        Console.WriteLine("Data loaded.");
-
         Console.WriteLine("Press 'h' for help");
+
         var done = false;
         while (!done)
         {
@@ -82,6 +77,20 @@ internal static class Program
         }
     }
 
+    private static void LoadMnistDataset()
+    {
+        if (_trainingData == null)
+        {
+            Console.WriteLine("Loading MNIST data...");
+            // Загружаем данные как обычно
+            _trainingData = MnistLoader.LoadData("../../../../../mnist-data/train-images.idx3-ubyte", "../../../../../mnist-data/train-labels.idx1-ubyte");
+            Console.WriteLine($"Traning dataset: {_trainingData.Count} images");
+            _testData = MnistLoader.LoadData("../../../../../mnist-data/t10k-images.idx3-ubyte", "../../../../../mnist-data/t10k-labels.idx1-ubyte");
+            Console.WriteLine($"Test dataset: {_testData.Count} images");
+            Console.WriteLine("Data loaded.");
+        }
+    }
+
     private static NeuralNetwork LoadNetwork(List<object>? arguments)
     {
         throw new NotImplementedException();
@@ -89,41 +98,11 @@ internal static class Program
 
     private static NeuralNetwork TrainNetwork(List<object>? args)
     {
-        var network = new NeuralNetwork(new MeanSquaredError());
+        LoadMnistDataset();
 
-        // Архитектура CNN (похожая на LeNet)
-        // Вход: 28x28x1
-        network.AddLayer(new ConvolutionalLayer(
-            filterCount: 6,
-            filterSize: 5,
-            stride: 1,
-            inputDepth: 1,
-            paddingType: PaddingType.Same)); // Выход: 24x24x6
-        network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
-        network.AddLayer(new MaxPoolingLayer(poolSize: 2, stride: 2)); // Выход: 12x12x6
+        Console.WriteLine("Initializing CNN");
 
-        network.AddLayer(new ConvolutionalLayer(
-            filterCount: 16,
-            filterSize: 5,
-            stride: 1,
-            inputDepth: 6,
-            paddingType: PaddingType.Same)); // Выход: 8x8x16
-        network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
-        network.AddLayer(new MaxPoolingLayer(poolSize: 2, stride: 2)); // Выход: 4x4x16
-
-        network.AddLayer(new FlattenLayer()); // Выход: Matrix (256x1)
-
-        network.AddLayer(new LinearLayer(
-            inputSize: 7 * 7 * 16,
-            outputSize: 131));
-        network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
-
-        network.AddLayer(new LinearLayer(inputSize: 131, outputSize: 73));
-        network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
-
-        network.AddLayer(new LinearLayer(inputSize: 73, outputSize: 10));
-
-        //network.SetLossFunction();
+        var network = new MnistCnn();
 
         Console.WriteLine("Starting CNN training... This will be slow!");
 
@@ -135,7 +114,7 @@ internal static class Program
             cnnTrainingData.Add((inputTensor, target));
         }
 
-        if (args.Count == 1)
+        if (args?.Count == 1)
         {
             network.Train(cnnTrainingData.Take((int)args[0]).ToList(), epochs: 5, learningRate: 0.03f);
         }
