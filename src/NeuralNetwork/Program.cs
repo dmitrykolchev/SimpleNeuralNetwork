@@ -9,6 +9,7 @@ internal static class Program
 {
     private static List<(Matrix, Matrix)> _trainingData = null!;
     private static List<(Matrix, Matrix)> _testData = null!;
+    private static NeuralNetwork _network = null!;
 
     static void Main()
     {
@@ -16,9 +17,74 @@ internal static class Program
         // Загружаем данные как обычно
         _trainingData = MnistLoader.LoadData("../../../../../mnist-data/train-images.idx3-ubyte", "../../../../../mnist-data/train-labels.idx1-ubyte");
         _testData = MnistLoader.LoadData("../../../../../mnist-data/t10k-images.idx3-ubyte", "../../../../../mnist-data/t10k-labels.idx1-ubyte");
-
         Console.WriteLine("Data loaded.");
 
+        Console.WriteLine("Press 'h' for help");
+        var done = false;
+        while (!done)
+        {
+            Console.Write(">");
+            try
+            {
+                var commandText = Console.ReadLine();
+                var command = CommandInfo.Parse(commandText);
+                switch (command.Command)
+                {
+                    case CommandType.Help:
+                        PrintHelp();
+                        break;
+                    case CommandType.PrintImage:
+                        if (_network == null)
+                        {
+                            throw new InvalidOperationException("Invalid NN state. Please train network first");
+                        }
+                        PrintImage(command.Arguments);
+                        break;
+                    case CommandType.RecognizeImage:
+                        if (_network == null)
+                        {
+                            throw new InvalidOperationException("Invalid NN state. Please train network first");
+                        }
+                        RecognizeImage(_network, command.Arguments);
+                        break;
+                    case CommandType.Quit:
+                        done = true;
+                        break;
+                    case CommandType.SaveNetwork:
+                        if (_network == null)
+                        {
+                            throw new InvalidOperationException("Invalid NN state. Please train network first");
+                        }
+                        SaveNetwork(_network);
+                        break;
+                    case CommandType.LoadNetwork:
+                        _network = LoadNetwork(command.Arguments);
+                        break;
+                    case CommandType.TrainNetwork:
+                        _network = TrainNetwork(command.Arguments);
+                        break;
+                    case CommandType.Invalid:
+                        Console.WriteLine("Unknown command or invalid parameter");
+                        break;
+                    default:
+                        Console.WriteLine($"Unknown command {command.Command}");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+        }
+    }
+
+    private static NeuralNetwork LoadNetwork(List<object>? arguments)
+    {
+        throw new NotImplementedException();
+    }
+
+    private static NeuralNetwork TrainNetwork(List<object>? args)
+    {
         var network = new NeuralNetwork(new MeanSquaredError());
 
         // Архитектура CNN (похожая на LeNet)
@@ -45,13 +111,13 @@ internal static class Program
 
         network.AddLayer(new LinearLayer(
             inputSize: 7 * 7 * 16,
-            outputSize: 120));
+            outputSize: 131));
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
 
-        network.AddLayer(new LinearLayer(inputSize: 120, outputSize: 84));
+        network.AddLayer(new LinearLayer(inputSize: 131, outputSize: 73));
         network.AddLayer(new ActivationLayer(ActivationFunctions.ReLU, ActivationFunctions.ReLUDerivative));
 
-        network.AddLayer(new LinearLayer(inputSize: 84, outputSize: 10));
+        network.AddLayer(new LinearLayer(inputSize: 73, outputSize: 10));
 
         //network.SetLossFunction();
 
@@ -65,8 +131,14 @@ internal static class Program
             cnnTrainingData.Add((inputTensor, target));
         }
 
-        // Для простоты примера, обучимся на небольшой части данных
-        network.Train(cnnTrainingData.Take(2000).ToList(), epochs: 5, learningRate: 0.01f);
+        if (args.Count == 1)
+        {
+            network.Train(cnnTrainingData.Take((int)args[0]).ToList(), epochs: 5, learningRate: 0.03f);
+        }
+        else
+        {
+            network.Train(cnnTrainingData, epochs: 5, learningRate: 0.03f);
+        }
 
         Console.WriteLine("Training complete.");
 
@@ -88,48 +160,7 @@ internal static class Program
 
         var accuracy = (float)correctPredictions / cnnTestData.Count;
         Console.WriteLine($"Test Accuracy on 1000 samples: {accuracy:P2}");
-
-        Console.WriteLine("Press 'h' for help");
-        var done = false;
-        var valid = true;
-        while (!done)
-        {
-            if (valid)
-            {
-                Console.Write(">");
-            }
-            var keyInfo = Console.ReadKey(true);
-            valid = true;
-            switch (keyInfo.Key)
-            {
-                case ConsoleKey.H:
-                    Console.WriteLine();
-                    PrintHelp();
-                    break;
-                case ConsoleKey.P:
-                    Console.WriteLine();
-                    PrintImage();
-                    break;
-                case ConsoleKey.R:
-                    Console.WriteLine();
-                    RecognizeImage(network);
-                    break;
-                case ConsoleKey.Q:
-                    Console.WriteLine();
-                    done = true;
-                    break;
-                case ConsoleKey.S:
-                    Console.WriteLine();
-                    SaveNetwork(network);
-                    break;
-                case ConsoleKey.Enter:
-                    Console.WriteLine();
-                    break;
-                default:
-                    valid = false;  
-                    break;
-            }
-        }
+        return network;
     }
 
     private static void SaveNetwork(NeuralNetwork network)
@@ -137,69 +168,95 @@ internal static class Program
         Console.WriteLine("saving isn't implemented");
     }
 
-    private static void RecognizeImage(NeuralNetwork network)
+    private static void RecognizeImage(NeuralNetwork network, List<object>? args)
     {
-        var image = PrintImage();
-        if (image >= 0)
+        if (args?.Count == 1)
         {
-            var (inputMatrix, target) = _testData[image];
-            var inputTensor = SimpleTensor.FromMatrix(inputMatrix, 28, 28, 1);
-            // Убедимся, что Predict в NeuralNetwork также работает с object
-            var prediction = (Matrix)network.Predict(inputTensor);
-            var predictedValue = prediction.GetPredictedClass();
-            if (predictedValue == target.GetPredictedClass())
+            var imageIndex = PrintImage(args);
+            RecognizeImage(network, imageIndex);
+        }
+        else
+        {
+            var imageIndex = PrintImage([]);
+            if (imageIndex >= 0)
             {
-                Console.WriteLine($"Predicted value: {predictedValue} (valid)");
-            }
-            else
-            {
-                Console.WriteLine($"Predicted value: {predictedValue} (invalid)");
+                RecognizeImage(network, imageIndex);
             }
         }
     }
 
-    private static int PrintImage()
+    private static void RecognizeImage(NeuralNetwork network, int imageIndex)
     {
-        Console.Write($"Print image index from 0 to {_testData.Count - 1}: ");
-        var text = Console.ReadLine();
-        if (int.TryParse(text, out var value))
+        var (inputMatrix, target) = _testData[imageIndex];
+        var inputTensor = SimpleTensor.FromMatrix(inputMatrix, 28, 28, 1);
+        // Убедимся, что Predict в NeuralNetwork также работает с object
+        var prediction = (Matrix)network.Predict(inputTensor);
+        var predictedValue = prediction.GetPredictedClass();
+        if (predictedValue == target.GetPredictedClass())
         {
-            if (value >= 0 && value < _testData.Count)
+            Console.WriteLine($"Predicted value: {predictedValue} (valid)");
+        }
+        else
+        {
+            Console.WriteLine($"Predicted value: {predictedValue} (invalid)");
+        }
+    }
+
+    private static int PrintImage(List<object>? args)
+    {
+        if (args?.Count == 1)
+        {
+            PrintImage((int)args[0]);
+            return (int)args[0];
+        }
+        else
+        {
+            Console.Write($"Image index (0 to {_testData.Count - 1}): ");
+            var text = Console.ReadLine();
+            if (int.TryParse(text, out var value))
             {
-                (Matrix image, Matrix label) item = _testData[value];
-                Console.WriteLine($"Label: {item.label.GetMaxIndex().row}");
-                Console.WriteLine("+--------------------------------------------------------+");
-                for(var y = 0; y < 28; y++)
+                if (value >= 0 && value < _testData.Count)
                 {
-                    Console.Write("|");
-                    for(var x = 0; x < 28; x++)
-                    {
-                        var offset = y * 28 + x;
-                        var pixel = item.image[offset, 0];
-                        if(pixel > 0.75f)
-                        {
-                            Console.Write("@@");
-                        }
-                        else if(pixel > 0.5f)
-                        {
-                            Console.Write("oo");
-                        }
-                        else if (pixel > 0.25f)
-                        {
-                            Console.Write("..");
-                        }
-                        else
-                        {
-                            Console.Write("  ");
-                        }
-                    }
-                    Console.WriteLine("|");
+                    PrintImage(value);
+                    return value;
                 }
-                Console.WriteLine("+--------------------------------------------------------+");
-                return value;
             }
         }
         return -1;
+    }
+
+    private static void PrintImage(int imageIndex)
+    {
+        (Matrix image, Matrix label) item = _testData[imageIndex];
+        Console.WriteLine($"Label: {item.label.GetMaxIndex().row}");
+        Console.WriteLine("+--------------------------------------------------------+");
+        for (var y = 0; y < 28; y++)
+        {
+            Console.Write("|");
+            for (var x = 0; x < 28; x++)
+            {
+                var offset = y * 28 + x;
+                var pixel = item.image[offset, 0];
+                if (pixel > 0.75f)
+                {
+                    Console.Write("@@");
+                }
+                else if (pixel > 0.5f)
+                {
+                    Console.Write("oo");
+                }
+                else if (pixel > 0.25f)
+                {
+                    Console.Write("..");
+                }
+                else
+                {
+                    Console.Write("  ");
+                }
+            }
+            Console.WriteLine("|");
+        }
+        Console.WriteLine("+--------------------------------------------------------+");
     }
 
     private static void PrintHelp()
@@ -208,5 +265,7 @@ internal static class Program
         Console.WriteLine("H - Help");
         Console.WriteLine("P - Print image");
         Console.WriteLine("R - Recognize image");
+        Console.WriteLine("S - Save NN parameters");
+        Console.WriteLine("L - Load NN parameters");
     }
 }

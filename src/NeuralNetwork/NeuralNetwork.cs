@@ -74,13 +74,13 @@ public class NeuralNetwork
                 {
                     layer.UpdateParameters(learningRate);
                 }
-                if (count % 1000 == 999)
+                ++count;
+                if (count % 578 == 577)
                 {
                     var remainingTime = (double)((trainingData.Count - count) * stopwatch.ElapsedMilliseconds) / count / 1000.0;
                     var elapsedTime = (double)(stopwatch.ElapsedMilliseconds) / 1000.0;
-                    Console.Write($"\r{count,6}, {(double)stopwatch.ElapsedMilliseconds/count:f2} ms per image, ET: {TimeSpan.FromSeconds(elapsedTime)}, RT: {TimeSpan.FromSeconds(remainingTime)}");
+                    Console.Write($"\r{count,6}, {(double)stopwatch.ElapsedMilliseconds / count:f2} ms per image, ET: {TimeSpan.FromSeconds(elapsedTime)}, RT: {TimeSpan.FromSeconds(remainingTime)}");
                 }
-                ++count;
             }
             Console.Write($"\r{count,6}, {(double)stopwatch.ElapsedMilliseconds / count:f2} ms per image, ET: {TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds)}");
             Console.WriteLine($" -> Epoch {i + 1}/{epochs}, Loss: {totalLoss / trainingData.Count}");

@@ -3,6 +3,8 @@
 // See LICENSE in the project root for license information
 // </copyright>
 
+using System.Numerics.Tensors;
+
 namespace NeuralNetwork;
 
 /// <summary>
@@ -13,12 +15,20 @@ public class MeanSquaredError : ILossFunction
     public float Calculate(Matrix predicted, Matrix actual)
     {
         using var diff = Matrix.Subtract(predicted, actual);
-        float sum = 0;
-        for (var i = 0; i < diff.Rows; i++)
+        if(diff.Stride == 1)
         {
-            sum += MathF.Pow(diff[i, 0], 2f);
+            var data = diff.AsSpan();
+            return TensorPrimitives.Dot(data, data) / diff.Rows;
         }
-        return sum / diff.Rows;
+        else
+        {
+            float sum = 0;
+            for (var i = 0; i < diff.Rows; i++)
+            {
+                sum += MathF.Pow(diff[i, 0], 2f);
+            }
+            return sum / diff.Rows;
+        }
     }
 
     public Matrix CalculateDerivative(Matrix predicted, Matrix actual)
