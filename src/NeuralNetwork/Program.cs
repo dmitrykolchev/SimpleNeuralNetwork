@@ -63,17 +63,21 @@ internal static class Program
                     case CommandType.TrainNetwork:
                         _network = TrainNetwork(command.Arguments);
                         break;
+                    case CommandType.None:
+                        break;
                     case CommandType.Invalid:
-                        Console.WriteLine("Unknown command or invalid parameter");
-                        break;
+                        throw new InvalidOperationException("Unknown command or invalid parameter");
                     default:
-                        Console.WriteLine($"Unknown command {command.Command}");
-                        break;
+                        throw new InvalidOperationException($"Unknown command {command.Command}");
                 }
             }
             catch (Exception ex)
             {
+                var color = Console.ForegroundColor;
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(ex.Message);
                 Console.WriteLine(ex.ToString());
+                Console.ForegroundColor = color;
             }
         }
     }
@@ -261,11 +265,18 @@ internal static class Program
 
     private static void PrintHelp()
     {
-        Console.WriteLine("Q - Quit");
-        Console.WriteLine("H - Help");
-        Console.WriteLine("P - Print image");
-        Console.WriteLine("R - Recognize image");
-        Console.WriteLine("S - Save NN parameters");
-        Console.WriteLine("L - Load NN parameters");
+        var color = Console.ForegroundColor;
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("-----------------------------------------------");
+        Console.WriteLine(" H                  - Print [H]elp information");
+        Console.WriteLine(" P [ImageIndex]     - [P]rint image");
+        Console.WriteLine(" R [ImageIndex]     - [R]ecognize image");
+        Console.WriteLine(" T [NumberOfImages] - [T]rain neural network");
+        Console.WriteLine(" S [Filename]       - [S]ave NN parameters");
+        Console.WriteLine(" L [FileName]       - [L]oad NN parameters");
+        Console.WriteLine("-----------------------------------------------");
+        Console.WriteLine(" Q                  - [Q]uit");
+        Console.WriteLine("-----------------------------------------------");
+        Console.ForegroundColor = color;
     }
 }
