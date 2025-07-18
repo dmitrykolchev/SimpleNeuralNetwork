@@ -1,4 +1,4 @@
-// <copyright file="Matrix.cs" company="Dmitry Kolchev">
+// <copyright file="MatrixImpl.cs" company="Dmitry Kolchev">
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
@@ -6,260 +6,306 @@
 using System.Diagnostics;
 using System.Numerics.Tensors;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace NeuralNetwork;
 
-/// <summary>
-/// Представляет матрицу, использующую неуправляемую выровненную память для высокой производительности.
-/// КРИТИЧЕСКИ ВАЖНО: Объекты этого класса ДОЛЖНЫ быть освобождены через Dispose() или блок using,
-/// чтобы избежать утечек нативной памяти.
-/// </summary>
-
-[DebuggerDisplay("(r:{Rows}, c:{Cols}), size:{Size}")]
-public sealed unsafe class MatrixOld : IDisposable
+[DebuggerDisplay("(r:{Rows}, c:{Cols})")]
+public unsafe class Matrix : IDisposable
 {
-    public readonly int Rows;
-    public readonly int Cols;
-    public readonly int Size;
+    private const int AlignmentBytes = 256 / 8;
+    private const int AlignmentFloats = AlignmentBytes / sizeof(float);
 
-    // Сделан internal для прямого доступа из других unsafe-классов (Tensor) без копирования.
-    internal readonly float[] _data = null!;
+    private readonly int _dataLength;
+    private readonly int _stride;
+    private readonly int _rows;
+    private readonly int _cols;
 
+    private float* _data;
     private bool _disposed;
 
-    public float this[int row, int col]
+    private Matrix(int rows, int cols)
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get
+        _rows = rows;
+        _cols = cols;
+        _stride = cols == 1
+            ? 1
+            : (cols + AlignmentFloats - 1) & ~(AlignmentFloats - 1);
+        _dataLength = _stride * _rows;
+        _data = (float*)NativeMemory.AlignedAlloc((nuint)_dataLength * sizeof(float), AlignmentBytes);
+    }
+
+    public static Matrix CreateVector(ReadOnlySpan<float> data)
+    {
+        var c = new Matrix(data.Length, 1);
+        data.CopyTo(c.AsSpan());
+        return c;
+    }
+
+    public static Matrix CreateZeros(int rows, int cols)
+    {
+        var c = new Matrix(rows, cols);
+        for (var row = 0; row < c.Rows; row++)
         {
-#if DEBUG
-            if (row < 0 || row >= Rows || col < 0 || col >= Cols)
-                throw new IndexOutOfRangeException();
-#endif
-            return _data[row * Cols + col];
+            c.GetRow(row).Clear();
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set
+        return c;
+    }
+
+    public static Matrix CreateOnes(int rows, int cols)
+    {
+        var c = new Matrix(rows, cols);
+        for (var row = 0; row < c.Rows; row++)
         {
-#if DEBUG
-            if (row < 0 || row >= Rows || col < 0 || col >= Cols)
-                throw new IndexOutOfRangeException();
-#endif
-            _data[row * Cols + col] = value;
+            c.GetRow(row).Fill(1f);
+        }
+        return c;
+    }
+
+    public static Matrix CreateIdentity(int rows, int cols)
+    {
+        if (rows != cols)
+        {
+            throw new ArgumentException("rows != cols");
+        }
+        var c = new Matrix(rows, cols);
+        for (var row = 0; row < c.Rows; row++)
+        {
+            var rowC = c.GetRow(row);
+            rowC.Clear();
+            rowC[row] = 1f;
+        }
+        return c;
+    }
+
+    public static Matrix CreateRandom(int rows, int cols)
+    {
+        var c = new Matrix(rows, cols);
+        c.Randomize();
+        return c;
+    }
+
+    public int Rows => _rows;
+
+    public int Cols => _cols;
+
+    public int Stride => _stride;
+
+    internal float* Data => _data;
+
+    public ref float this[int row, int col] => ref _data[row * _stride + col];
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Span<float> AsSpan()
+    {
+        return new Span<float>(_data, _dataLength);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Span<float> GetRow(int row)
+    {
+        return new Span<float>(_data + row * _stride, Cols);
+    }
+
+    public static Matrix Add(Matrix a, Matrix b)
+    {
+        var c = new Matrix(rows: a.Rows, cols: a.Cols);
+        for (var row = 0; row < c.Rows; row++)
+        {
+            var rowA = a.GetRow(row);
+            var rowB = b.GetRow(row);
+            var rowC = c.GetRow(row);
+            TensorPrimitives.Add(rowA, rowB, rowC);
+        }
+        return c;
+    }
+
+    public static void AddI(Matrix a, Matrix b)
+    {
+        for (var row = 0; row < a.Rows; row++)
+        {
+            var rowA = a.GetRow(row);
+            var rowB = b.GetRow(row);
+            TensorPrimitives.Add(rowA, rowB, rowA);
         }
     }
 
-    public MatrixOld(int rows, int cols)
+    public static Matrix Subtract(Matrix a, Matrix b)
     {
-        if (rows < 0 || cols < 0)
+        var c = new Matrix(rows: a.Rows, cols: a.Cols);
+        for (var row = 0; row < c.Rows; row++)
         {
-            throw new ArgumentException("MatrixOld dimensions cannot be negative.");
+            var rowA = a.GetRow(row);
+            var rowB = b.GetRow(row);
+            var rowC = c.GetRow(row);
+            TensorPrimitives.Subtract(rowA, rowB, rowC);
         }
-
-        Rows = rows;
-        Cols = cols;
-        Size = rows * cols;
-
-        if (Size == 0)
-        {
-            return;
-        }
-        _data = new float[Size];
+        return c;
     }
 
-    public static MatrixOld CreateVector(float[] data)
+    public static void SubtractI(Matrix a, Matrix b)
     {
-        var m = new MatrixOld(data.Length, 1);
-        if (m._data == null)
+        for (var row = 0; row < a.Rows; row++)
         {
-            return m;
+            var rowA = a.GetRow(row);
+            var rowB = b.GetRow(row);
+            TensorPrimitives.Subtract(rowA, rowB, rowA);
         }
-
-        Array.Copy(data, 0, m._data, 0, data.Length);
-        return m;
     }
 
-    public static MatrixOld operator +(MatrixOld a, MatrixOld b)
+    public static Matrix Multiply(Matrix a, float alpha)
     {
-        if (a.Rows != b.Rows || a.Cols != b.Cols)
+        var c = new Matrix(rows: a.Rows, cols: a.Cols);
+        if (a.Stride == 1 && c.Stride == 1)
         {
-            throw new ArgumentException("Matrices must have same dimensions.");
+            TensorPrimitives.Multiply(a.AsSpan(), alpha, c.AsSpan());
         }
-
-        var result = new MatrixOld(a.Rows, a.Cols);
-        if (result._data == null)
+        else
         {
-            return result;
-        }
-
-        TensorPrimitives.Add(
-            a._data,
-            b._data,
-            result._data);
-        return result;
-    }
-
-    public static MatrixOld operator -(MatrixOld a, MatrixOld b)
-    {
-        if (a.Rows != b.Rows || a.Cols != b.Cols)
-        {
-            throw new ArgumentException("Matrices must have same dimensions.");
-        }
-
-        var result = new MatrixOld(a.Rows, a.Cols);
-        if (result._data == null)
-        {
-            return result;
-        }
-
-        TensorPrimitives.Subtract(
-            a._data,
-            b._data,
-            result._data);
-        return result;
-    }
-
-    public static MatrixOld operator *(MatrixOld a, float scalar)
-    {
-        var result = new MatrixOld(a.Rows, a.Cols);
-        if (result._data == null)
-        {
-            return result;
-        }
-
-        TensorPrimitives.Multiply(a._data, scalar, result._data);
-        return result;
-    }
-
-    public static MatrixOld Multiply(MatrixOld a, bool aTransposed, MatrixOld b, bool bTransposed)
-    {
-        if (aTransposed)
-        {
-            a = Transpose(a);
-        }
-        if (!bTransposed)
-        {
-            b = Transpose(b);
-        }
-
-        var result = new MatrixOld(a.Rows, b.Rows);
-        if (result._data == null)
-        {
-            return result;
-        }
-
-        var aCols = a.Cols;
-        for (var i = 0; i < a.Rows; i++)
-        {
-            var rowA = a._data.AsSpan(i * aCols, aCols);
-            for (var j = 0; j < b.Rows; j++)
+            for (var row = 0; row < c.Rows; row++)
             {
-                var rowB = b._data.AsSpan(j * aCols, aCols);
-                result._data[i * result.Cols + j] = TensorPrimitives.Dot(rowA, rowB);
+                var rowA = a.GetRow(row);
+                var rowC = c.GetRow(row);
+                TensorPrimitives.Multiply(rowA, alpha, rowC);
             }
         }
-        return result;
+        return c;
     }
 
-    /// <summary>
-    /// Выполняет поэлементное умножение матриц (произведение Адамара).
-    /// </summary>
-    public static MatrixOld Hadamard(MatrixOld a, MatrixOld b)
+    public static Matrix Multiply(Matrix a, bool transposeA, Matrix b, bool transposeB)
+    {
+        var aRows = transposeA ? a.Cols : a.Rows;
+        var aCols = transposeA ? a.Rows : a.Cols;
+        var bRows = transposeB ? b.Cols : b.Rows;
+        var bCols = transposeB ? b.Rows : b.Cols;
+
+        if (aCols != bRows)
+        {
+            throw new ArgumentException("Non compatible matrix size");
+        }
+
+        a = transposeA ? Transpose(a) : a;
+        b = transposeB ? b : Transpose(b);
+
+        var c = new Matrix(rows: aRows, cols: bCols);
+        for (int row = 0, rows = c.Rows; row < rows; row++)
+        {
+            var rowA = a.GetRow(row);
+            var rowC = c.GetRow(row);
+            for (int col = 0, cols = c.Cols; col < cols; col++)
+            {
+                var rowB = b.GetRow(col);
+                rowC[col] = TensorPrimitives.Dot(rowA, rowB);
+            }
+        }
+        if (transposeA)
+        {
+            a.Dispose();
+        }
+        if (!transposeB)
+        {
+            b.Dispose();
+        }
+        return c;
+    }
+
+    public static Matrix Hadamard(Matrix a, Matrix b)
     {
         if (a.Rows != b.Rows || a.Cols != b.Cols)
         {
             throw new ArgumentException("Matrices must have the same dimensions for Hadamard product.");
         }
 
-        var result = new MatrixOld(a.Rows, a.Cols);
-        if (result._data == null)
+        var c = new Matrix(a.Rows, a.Cols);
+        if (a.Stride == 1 && b.Stride == 1)
         {
-            return result;
+            TensorPrimitives.Multiply(a.AsSpan(), b.AsSpan(), c.AsSpan());
         }
-
-        TensorPrimitives.Multiply(
-            a._data,
-            b._data,
-            result._data);
-        return result;
-    }
-
-    #region Другие методы
-
-    public static MatrixOld Transpose(MatrixOld m)
-    {
-        var result = new MatrixOld(m.Cols, m.Rows);
-        if (result._data == null)
+        else
         {
-            return result;
-        }
-
-        for (var i = 0; i < m.Rows; i++)
-        {
-            for (var j = 0; j < m.Cols; j++)
+            for (var row = 0; row < a.Rows; row++)
             {
-                result._data[j * result.Cols + i] = m._data[i * m.Cols + j];
+                var rowA = a.GetRow(row);
+                var rowB = b.GetRow(row);
+                var rowC = c.GetRow(row);
+                TensorPrimitives.Multiply(rowA, rowB, rowC);
             }
         }
-        return result;
+        return c;
+    }
+
+    public static Matrix Transpose(Matrix a)
+    {
+        var c = new Matrix(a.Cols, a.Rows);
+        if (a.Cols == 1 || a.Rows == 1)
+        {
+            a.AsSpan().CopyTo(c.AsSpan());
+        }
+        else
+        {
+            var cSpan = c.AsSpan();
+            for (var row = 0; row < a.Rows; row++)
+            {
+                var rowData = a.GetRow(row);
+                for (int col = 0, offDst = row; col < a.Cols; col++, offDst += c.Stride)
+                {
+                    cSpan[offDst] = rowData[col];
+                }
+            }
+        }
+        return c;
     }
 
     public void Randomize()
     {
-        if (_data == null)
+        var rand = Random.Shared;
+        var scale = MathF.Sqrt(1.0f / Rows);
+        for (var row = 0; row < Rows; row++)
         {
-            return;
+            var rowData = GetRow(row);
+            for (var col = 0; col < Cols; col++)
+            {
+                rowData[col] = (rand.NextSingle() * 2f - 1f) * scale;
+            }
         }
+    }
 
-        var rand = new Random();
-        var scale = (float)Math.Sqrt(1.0 / Rows);
-        for (var i = 0; i < Size; i++)
+    public Matrix Map(Action<ReadOnlySpan<float>, Span<float>> func)
+    {
+        var c = new Matrix(Rows, Cols);
+        for (var row = 0; row < Rows; row++)
         {
-            _data[i] = (rand.NextSingle() * 2f - 1f) * scale;
+            var rowA = GetRow(row);
+            var rowC = c.GetRow(row);
+            func(rowA, rowC);
         }
+        return c;
+    }
+
+    public (int row, int col) GetMaxIndex()
+    {
+        int maxRow = 0, maxCol = 0;
+        var maxValue = this[0, 0];
+        for (var row = 0; row < Rows; row++)
+        {
+            var rowData = GetRow(row);
+            for (var col = 0; col < Cols; col++)
+            {
+                if (rowData[col] > maxValue)
+                {
+                    maxValue = rowData[col];
+                    maxRow = row; maxCol = col;
+                }
+            }
+        }
+        return (maxRow, maxCol);
     }
 
     public int GetPredictedClass()
     {
-        if (_data == null || Size == 0)
-        {
-            return -1;
-        }
-
-        var maxIndex = 0;
-        var maxValue = _data[0];
-        for (var i = 1; i < Size; i++)
-        {
-            if (_data[i] > maxValue)
-            {
-                maxValue = _data[i];
-                maxIndex = i;
-            }
-        }
-        return maxIndex;
+        (var row, var col) = GetMaxIndex();
+        return row * Cols + col;
     }
-
-    /// <summary>
-    /// Применяет произвольную функцию к каждому элементу матрицы и возвращает новую матрицу.
-    /// ВНИМАНИЕ: Этот метод не векторизован и может быть медленным из-за вызова делегата в цикле.
-    /// Для стандартных функций активации (ReLU, Sigmoid) следует создавать специализированные
-    /// векторизованные методы для максимальной производительности.
-    /// </summary>
-    public MatrixOld Map(Action<ReadOnlySpan<float>, Span<float>> func)
-    {
-        var result = new MatrixOld(Rows, Cols);
-        if (result._data == null)
-        {
-            return result;
-        }
-
-        func(_data.AsSpan(), result._data.AsSpan());
-        return result;
-    }
-
-    #endregion
-
-    #region IDisposable
 
     public void Dispose()
     {
@@ -272,13 +318,16 @@ public sealed unsafe class MatrixOld : IDisposable
         if (!_disposed)
         {
             _disposed = true;
+            if (_data != null)
+            {
+                NativeMemory.AlignedFree(_data);
+                _data = null;
+            }
         }
     }
 
-    ~MatrixOld()
+    ~Matrix()
     {
         Dispose(false);
     }
-
-    #endregion
 }
