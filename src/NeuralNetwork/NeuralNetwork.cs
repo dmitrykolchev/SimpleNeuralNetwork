@@ -82,6 +82,7 @@ public class NeuralNetwork
                 }
                 ++count;
             }
+            Console.Write($"\r{count,6}, {(double)stopwatch.ElapsedMilliseconds / count:f2} ms per image, ET: {TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds)}");
             Console.WriteLine($" -> Epoch {i + 1}/{epochs}, Loss: {totalLoss / trainingData.Count}");
         }
     }
