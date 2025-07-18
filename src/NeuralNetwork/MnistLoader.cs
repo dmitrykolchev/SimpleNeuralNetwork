@@ -2,6 +2,8 @@
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
+using System.Numerics;
+
 namespace NeuralNetwork;
 
 /// <summary>
