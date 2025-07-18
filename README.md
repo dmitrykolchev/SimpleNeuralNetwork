@@ -6,7 +6,7 @@ A convolutional neural network that classifies handwritten digits (0-9) using th
 
 **Training Performance**
 
-<img width="922" height="270" alt="image" src="https://github.com/user-attachments/assets/d1c5596c-99f7-47ba-b139-c3474ce5ebeb" />
+<img width="858" height="307" alt="image" src="https://github.com/user-attachments/assets/b376ef77-3608-42be-8657-fd40fc6ad123" />
 
 <img width="715" height="691" alt="image" src="https://github.com/user-attachments/assets/3d158b04-56f4-47c0-8810-9e3bca19e304" />
 
