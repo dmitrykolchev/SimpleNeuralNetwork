@@ -10,7 +10,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="System.Numerics.Tensors" Version="10.0.0-preview.5.25277.114" />
+	  <ProjectReference Include="..\NeuralNetwork.Core\NeuralNetwork.Core.csproj" />
 	</ItemGroup>
 
 </Project>

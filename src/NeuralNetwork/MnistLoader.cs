@@ -2,7 +2,8 @@
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
-using System.Numerics;
+using System.Buffers.Binary;
+using System.Numerics.Tensors;
 
 namespace NeuralNetwork;
 
@@ -11,6 +12,7 @@ namespace NeuralNetwork;
 /// </summary>
 public static class MnistLoader
 {
+    // Данные в файлах MNIST хранятся в формате big-endian
     public static List<(Matrix, Matrix)> LoadData(string imageFile, string labelFile)
     {
         var data = new List<(Matrix, Matrix)>();
@@ -22,27 +24,26 @@ public static class MnistLoader
 
         // Пропускаем заголовки
         imageReader.ReadInt32(); // magic number
-        var numImages = SwapEndianness(imageReader.ReadInt32());
-        var rows = SwapEndianness(imageReader.ReadInt32());
-        var cols = SwapEndianness(imageReader.ReadInt32());
+        var numImages = BinaryPrimitives.ReverseEndianness(imageReader.ReadInt32());
+        var rows = BinaryPrimitives.ReverseEndianness(imageReader.ReadInt32());
+        var cols = BinaryPrimitives.ReverseEndianness(imageReader.ReadInt32());
 
         labelReader.ReadInt32(); // magic number
-        var numLabels = SwapEndianness(labelReader.ReadInt32());
+        var numLabels = BinaryPrimitives.ReverseEndianness(labelReader.ReadInt32());
 
         if (numImages != numLabels)
         {
             throw new IOException("Image and label file counts do not match.");
         }
 
+        var pixels = new float[rows * cols];
+        var bytes = new byte[rows * cols];
         for (var i = 0; i < numImages; i++)
         {
             // Читаем изображение
-            var pixels = new float[rows * cols];
-            for (var j = 0; j < rows * cols; j++)
-            {
-                // Нормализуем пиксели от 0-255 до 0-1
-                pixels[j] = imageReader.ReadByte() / 255.0f;
-            }
+            imageReader.Read(bytes, 0, bytes.Length);
+            TensorPrimitives.ConvertSaturating<byte, float>(bytes, pixels);
+            TensorPrimitives.Divide(pixels, 255f, pixels);
             var input = Matrix.CreateVector(pixels);
 
             // Читаем метку и преобразуем в one-hot вектор
@@ -55,15 +56,5 @@ public static class MnistLoader
         }
 
         return data;
-    }
-
-    // Данные в файлах MNIST хранятся в формате big-endian
-    private static int SwapEndianness(int value)
-    {
-        var b1 = (value >> 0) & 0xff;
-        var b2 = (value >> 8) & 0xff;
-        var b3 = (value >> 16) & 0xff;
-        var b4 = (value >> 24) & 0xff;
-        return b1 << 24 | b2 << 16 | b3 << 8 | b4 << 0;
     }
 }
