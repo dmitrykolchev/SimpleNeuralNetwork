@@ -83,9 +83,9 @@ internal static class Program
         {
             Console.WriteLine("Loading MNIST data...");
             // Загружаем данные как обычно
-            _trainingData = MnistLoader.LoadData("../../../../../mnist-data/train-images.idx3-ubyte", "../../../../../mnist-data/train-labels.idx1-ubyte");
+            _trainingData = MnistLoader.LoadData("../../../../../../mnist-data/train-images.idx3-ubyte", "../../../../../../mnist-data/train-labels.idx1-ubyte");
             Console.WriteLine($"Traning dataset: {_trainingData.Count} images");
-            _testData = MnistLoader.LoadData("../../../../../mnist-data/t10k-images.idx3-ubyte", "../../../../../mnist-data/t10k-labels.idx1-ubyte");
+            _testData = MnistLoader.LoadData("../../../../../../mnist-data/t10k-images.idx3-ubyte", "../../../../../../mnist-data/t10k-labels.idx1-ubyte");
             Console.WriteLine($"Test dataset: {_testData.Count} images");
             Console.WriteLine("Data loaded.");
         }

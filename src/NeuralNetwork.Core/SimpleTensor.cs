@@ -57,10 +57,7 @@ public sealed unsafe class SimpleTensor : IDisposable
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-#if DEBUG
-            if (w < 0 || w >= Width || h < 0 || h >= Height || d < 0 || d >= Depth)
-                throw new IndexOutOfRangeException();
-#endif
+            Debug.Assert(w >= 0 && h >= 0 && d >= 0 && w < Width && h < Height && d < Depth);
             return ref _data[(h * Width + w) * Depth + d];
         }
     }
@@ -126,9 +123,9 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// </summary>
     public SimpleTensor Map(Action<ReadOnlySpan<float>, Span<float>> func)
     {
-        var result = new SimpleTensor(Width, Height, Depth);
-        func(_data, result._data);
-        return result;
+        var c = new SimpleTensor(Width, Height, Depth);
+        func(_data, c._data);
+        return c;
     }
 
     /// <summary>
@@ -137,18 +134,17 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// </summary>
     public static SimpleTensor Hadamard(SimpleTensor a, SimpleTensor b)
     {
-        var result = new SimpleTensor(a.Width, a.Height, a.Depth);
-        Hadamard(a, b, result);
-        return result;
+        Debug.Assert(a.Width == b.Width && a.Height == b.Height && a.Depth == b.Depth);
+        var c = new SimpleTensor(a.Width, a.Height, a.Depth);
+        Hadamard(a, b, c);
+        return c;
     }
 
-    public static void Hadamard(SimpleTensor a, SimpleTensor b, SimpleTensor result)
+    public static void Hadamard(SimpleTensor a, SimpleTensor b, SimpleTensor c)
     {
-        if (a.Width != b.Width || a.Height != b.Height || a.Depth != b.Depth)
-        {
-            throw new ArgumentException("Tensors must have same dimensions for Hadamard product.");
-        }
-        TensorPrimitives.Multiply(a._data, b._data, result._data);
+        Debug.Assert(a.Width == b.Width && a.Height == b.Height && a.Depth == b.Depth);
+        Debug.Assert(a.Width == c.Width && a.Height == c.Height && a.Depth == c.Depth);
+        TensorPrimitives.Multiply(a._data, b._data, c._data);
     }
 
     public void Dispose()

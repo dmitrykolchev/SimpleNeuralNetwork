@@ -1,4 +1,4 @@
-// <copyright file="MatrixImpl.cs" company="Dmitry Kolchev">
+// <copyright file="Matrix.cs" company="Dmitry Kolchev">
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
@@ -7,6 +7,8 @@ using System.Diagnostics;
 using System.Numerics.Tensors;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Managed.Mkl.Native;
+using static Managed.Mkl.Native.MklCblas;
 
 namespace NeuralNetwork;
 
@@ -26,6 +28,7 @@ public unsafe class Matrix : IDisposable
 
     private Matrix(int rows, int cols)
     {
+        Debug.Assert(rows > 0 && cols > 0);
         _rows = rows;
         _cols = cols;
         _stride = cols == 1
@@ -37,6 +40,7 @@ public unsafe class Matrix : IDisposable
 
     public static Matrix CreateVector(ReadOnlySpan<float> data)
     {
+        Debug.Assert(data.Length > 0);
         var c = new Matrix(data.Length, 1);
         data.CopyTo(c.AsSpan());
         return c;
@@ -44,16 +48,15 @@ public unsafe class Matrix : IDisposable
 
     public static Matrix CreateZeros(int rows, int cols)
     {
+        Debug.Assert(rows > 0 && cols > 0);
         var c = new Matrix(rows, cols);
-        for (var row = 0; row < c.Rows; row++)
-        {
-            c.GetRow(row).Clear();
-        }
+        c.AsSpan().Clear();
         return c;
     }
 
     public static Matrix CreateOnes(int rows, int cols)
     {
+        Debug.Assert(rows > 0 && cols > 0);
         var c = new Matrix(rows, cols);
         for (var row = 0; row < c.Rows; row++)
         {
@@ -64,15 +67,13 @@ public unsafe class Matrix : IDisposable
 
     public static Matrix CreateIdentity(int rows, int cols)
     {
-        if (rows != cols)
-        {
-            throw new ArgumentException("rows != cols");
-        }
+        Debug.Assert(rows > 0 && cols > 0);
+        Debug.Assert(rows == cols);
         var c = new Matrix(rows, cols);
+        c.AsSpan().Clear();
         for (var row = 0; row < c.Rows; row++)
         {
             var rowC = c.GetRow(row);
-            rowC.Clear();
             rowC[row] = 1f;
         }
         return c;
@@ -80,6 +81,7 @@ public unsafe class Matrix : IDisposable
 
     public static Matrix CreateRandom(int rows, int cols)
     {
+        Debug.Assert(rows > 0 && cols > 0);
         var c = new Matrix(rows, cols);
         c.Randomize();
         return c;
@@ -93,7 +95,14 @@ public unsafe class Matrix : IDisposable
 
     internal float* Data => _data;
 
-    public ref float this[int row, int col] => ref _data[row * _stride + col];
+    public ref float this[int row, int col]
+    {
+        get
+        {
+            Debug.Assert(row >= 0 && col >= 0 && row < Rows && col < Cols);
+            return ref _data[row * _stride + col];
+        }
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<float> AsSpan()
@@ -104,53 +113,71 @@ public unsafe class Matrix : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<float> GetRow(int row)
     {
-        return new Span<float>(_data + row * _stride, Cols);
+        Debug.Assert(row >= 0 && row < Rows);
+        return new Span<float>(GetRowPtr(row), Cols);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal float* GetRowPtr(int row)
+    {
+        Debug.Assert(row >= 0 && row < Rows);
+        return _data + row * _stride;
     }
 
     public static Matrix Add(Matrix a, Matrix b)
     {
+        Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
         var c = new Matrix(rows: a.Rows, cols: a.Cols);
-        for (var row = 0; row < c.Rows; row++)
+        Add(a, b, c);
+        return c;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Add(Matrix a, Matrix b, Matrix c)
+    {
+        Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
+        Debug.Assert(a.Rows == c.Rows && a.Cols == c.Cols);
+        for (int row = 0, rows = c.Rows; row < rows; row++)
         {
             var rowA = a.GetRow(row);
             var rowB = b.GetRow(row);
             var rowC = c.GetRow(row);
             TensorPrimitives.Add(rowA, rowB, rowC);
         }
-        return c;
     }
 
     public static void AddI(Matrix a, Matrix b)
     {
-        for (var row = 0; row < a.Rows; row++)
-        {
-            var rowA = a.GetRow(row);
-            var rowB = b.GetRow(row);
-            TensorPrimitives.Add(rowA, rowB, rowA);
-        }
+        Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
+        Add(a, b, a);
     }
 
-    public static Matrix Subtract(Matrix a, Matrix b)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Subtract(Matrix a, Matrix b, Matrix c)
     {
-        var c = new Matrix(rows: a.Rows, cols: a.Cols);
-        for (var row = 0; row < c.Rows; row++)
+        Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
+        Debug.Assert(a.Rows == c.Rows && a.Cols == c.Cols);
+        for (int row = 0, rows = c.Rows; row < rows; row++)
         {
             var rowA = a.GetRow(row);
             var rowB = b.GetRow(row);
             var rowC = c.GetRow(row);
             TensorPrimitives.Subtract(rowA, rowB, rowC);
         }
+    }
+
+    public static Matrix Subtract(Matrix a, Matrix b)
+    {
+        Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
+        var c = new Matrix(rows: a.Rows, cols: a.Cols);
+        Subtract(a, b, c);
         return c;
     }
 
     public static void SubtractI(Matrix a, Matrix b)
     {
-        for (var row = 0; row < a.Rows; row++)
-        {
-            var rowA = a.GetRow(row);
-            var rowB = b.GetRow(row);
-            TensorPrimitives.Subtract(rowA, rowB, rowA);
-        }
+        Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
+        Subtract(a, b, a);
     }
 
     public static Matrix Multiply(Matrix a, float alpha)
@@ -173,6 +200,33 @@ public unsafe class Matrix : IDisposable
     }
 
     public static Matrix Multiply(Matrix a, bool transposeA, Matrix b, bool transposeB)
+    {
+        var aRows = transposeA ? a.Cols : a.Rows;
+        var aCols = transposeA ? a.Rows : a.Cols;
+        var bRows = transposeB ? b.Cols : b.Rows;
+        var bCols = transposeB ? b.Rows : b.Cols;
+        if (aCols != bRows)
+        {
+            throw new ArgumentException("Non compatible matrix size");
+        }
+
+        var c = new Matrix(rows: aRows, cols: bCols);
+
+        cblas_sgemm(CblasLayout.CblasRowMajor,
+            transposeA ? CblasTranspose.CblasTrans : CblasTranspose.CblasNoTrans,
+            transposeB ? CblasTranspose.CblasTrans : CblasTranspose.CblasNoTrans,
+            aRows,
+            bCols,
+            aCols,
+            1f,
+            a.Data, a.Stride,
+            b.Data, b.Stride,
+            0,
+            c.Data, c.Stride);
+        return c;
+    }
+
+    public static Matrix MultiplyDirect(Matrix a, bool transposeA, Matrix b, bool transposeB)
     {
         var aRows = transposeA ? a.Cols : a.Rows;
         var aCols = transposeA ? a.Rows : a.Cols;
@@ -211,10 +265,7 @@ public unsafe class Matrix : IDisposable
 
     public static Matrix Hadamard(Matrix a, Matrix b)
     {
-        if (a.Rows != b.Rows || a.Cols != b.Cols)
-        {
-            throw new ArgumentException("Matrices must have the same dimensions for Hadamard product.");
-        }
+        Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
 
         var c = new Matrix(a.Rows, a.Cols);
         if (a.Stride == 1 && b.Stride == 1)
@@ -237,7 +288,7 @@ public unsafe class Matrix : IDisposable
     public static Matrix Transpose(Matrix a)
     {
         var c = new Matrix(a.Cols, a.Rows);
-        if (a.Cols == 1 || a.Rows == 1)
+        if (a.Stride == 1 && c.Stride == 1)
         {
             a.AsSpan().CopyTo(c.AsSpan());
         }
@@ -289,13 +340,11 @@ public unsafe class Matrix : IDisposable
         for (var row = 0; row < Rows; row++)
         {
             var rowData = GetRow(row);
-            for (var col = 0; col < Cols; col++)
+            var col = TensorPrimitives.IndexOfMax(rowData);
+            if (rowData[col] > maxValue)
             {
-                if (rowData[col] > maxValue)
-                {
-                    maxValue = rowData[col];
-                    maxRow = row; maxCol = col;
-                }
+                maxValue = rowData[col];
+                maxRow = row; maxCol = col;
             }
         }
         return (maxRow, maxCol);

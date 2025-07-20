@@ -5,12 +5,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <RootNamespace />
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="intelmkl.redist.win-x64" Version="2025.2.0.627" />
     <PackageReference Include="intelopenmp.redist.win" Version="2025.2.0.756" />
     <PackageReference Include="inteltbb.redist.win" Version="2022.2.0.503" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.Numerics" />
   </ItemGroup>
 
 </Project>

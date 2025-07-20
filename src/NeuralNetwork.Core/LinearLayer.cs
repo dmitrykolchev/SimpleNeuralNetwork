@@ -27,8 +27,9 @@ public class LinearLayer : Layer
     public override object Forward(object input)
     {
         _lastInput = (Matrix)input;
-        using var temp = Matrix.Multiply(Weights, false, (Matrix)input, false);
-        return Matrix.Add(temp, Biases);
+        var temp = Matrix.Multiply(Weights, false, (Matrix)input, false);
+        Matrix.AddI(temp, Biases);
+        return temp;
     }
 
     public override object Backward(object outputGradient)
