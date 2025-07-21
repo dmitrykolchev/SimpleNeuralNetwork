@@ -87,6 +87,14 @@ public unsafe class Matrix : IDisposable
         return c;
     }
 
+    public static Matrix CreateRandom(int rows, int cols, Func<float> nextSingle)
+    {
+        Debug.Assert(rows > 0 && cols > 0);
+        var c = new Matrix(rows, cols);
+        c.Randomize(nextSingle);
+        return c;
+    }
+
     public int Rows => _rows;
 
     public int Cols => _cols;
@@ -309,14 +317,18 @@ public unsafe class Matrix : IDisposable
 
     public void Randomize()
     {
-        var rand = Random.Shared;
+        Randomize((_, _) => Random.Shared.NextSingle());
+    }
+
+    public void Randomize(Func<int, int, float> nextSingle)
+    {
         var scale = MathF.Sqrt(1.0f / Rows);
-        for (var row = 0; row < Rows; row++)
+        for (int row = 0, rows = Rows; row < rows; row++)
         {
             var rowData = GetRow(row);
-            for (var col = 0; col < Cols; col++)
+            for (int col = 0, cols = Cols; col < cols; col++)
             {
-                rowData[col] = (rand.NextSingle() * 2f - 1f) * scale;
+                rowData[col] = (nextSingle(row, col) * 2f - 1f) * scale;
             }
         }
     }
