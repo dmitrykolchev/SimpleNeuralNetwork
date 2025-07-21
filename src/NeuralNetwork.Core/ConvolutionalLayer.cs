@@ -33,7 +33,7 @@ public sealed unsafe class ConvolutionalLayer : Layer
 
     private Matrix _filterGradients = null!;
     private float[] _biasGradients = null!;
-    private SimpleTensor _lastInput = null!;
+    private Tensor _lastInput = null!;
 
     public ConvolutionalLayer(int filterCount, int filterSize, int stride, int inputDepth, PaddingType paddingType)
     {
@@ -74,13 +74,13 @@ public sealed unsafe class ConvolutionalLayer : Layer
 
     public override object Forward(object input)
     {
-        _lastInput = (SimpleTensor)input;
+        _lastInput = (Tensor)input;
 
         // Формула выхода с учетом паддинга: W_out = (W_in - F + 2P) / S + 1
         var outputHeight = (_lastInput.Height - _filterSize + 2 * _padding) / _stride + 1;
         var outputWidth = (_lastInput.Width - _filterSize + 2 * _padding) / _stride + 1;
 
-        var output = new SimpleTensor(outputWidth, outputHeight, _filterCount);
+        var output = new Tensor(outputWidth, outputHeight, _filterCount);
 
         //for (var f = 0; f < _filterCount; f++) // Для каждого фильтра
         Parallel.For(0, _filterCount, f =>
@@ -105,8 +105,8 @@ public sealed unsafe class ConvolutionalLayer : Layer
 
     public override object Backward(object outputGradientObj)
     {
-        var outputGradient = (SimpleTensor)outputGradientObj;
-        var inputGradient = new SimpleTensor(_lastInput.Width, _lastInput.Height, _lastInput.Depth);
+        var outputGradient = (Tensor)outputGradientObj;
+        var inputGradient = new Tensor(_lastInput.Width, _lastInput.Height, _lastInput.Depth);
 
         _filterGradients = Matrix.CreateZeros(_filterCount, _filterSize * _filterSize * _lastInput.Depth);
         _biasGradients = new float[_filterCount];

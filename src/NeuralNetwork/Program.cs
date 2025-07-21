@@ -110,7 +110,7 @@ internal static class Program
         var cnnTrainingData = new List<(object, Matrix)>();
         foreach (var (inputMatrix, target) in _trainingData)
         {
-            var inputTensor = SimpleTensor.FromMatrix(inputMatrix, 28, 28, 1);
+            var inputTensor = Tensor.FromMatrix(inputMatrix, 28, 28, 1);
             cnnTrainingData.Add((inputTensor, target));
         }
 
@@ -132,7 +132,7 @@ internal static class Program
 
         foreach (var (inputMatrix, target) in cnnTestData)
         {
-            var inputTensor = SimpleTensor.FromMatrix(inputMatrix, 28, 28, 1);
+            var inputTensor = Tensor.FromMatrix(inputMatrix, 28, 28, 1);
             // Убедимся, что Predict в NeuralNetwork также работает с object
             var prediction = (Matrix)network.Predict(inputTensor);
             if (prediction.GetPredictedClass() == target.GetPredictedClass())
@@ -171,7 +171,7 @@ internal static class Program
     private static void RecognizeImage(NeuralNetwork network, int imageIndex)
     {
         var (inputMatrix, target) = _testData[imageIndex];
-        var inputTensor = SimpleTensor.FromMatrix(inputMatrix, 28, 28, 1);
+        var inputTensor = Tensor.FromMatrix(inputMatrix, 28, 28, 1);
         // Убедимся, что Predict в NeuralNetwork также работает с object
         var prediction = (Matrix)network.Predict(inputTensor);
         var predictedValue = prediction.GetPredictedClass();

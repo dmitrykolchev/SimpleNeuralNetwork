@@ -1,4 +1,4 @@
-﻿// <copyright file="ActivationLayer.cs" company="Dmitry Kolchev">
+// <copyright file="ActivationLayer.cs" company="Dmitry Kolchev">
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
@@ -29,7 +29,7 @@ public class ActivationLayer : Layer
         {
             return m.Map(_activation);
         }
-        if (input is SimpleTensor t)
+        if (input is Tensor t)
         {
             return t.Map(_activation);
         }
@@ -43,10 +43,10 @@ public class ActivationLayer : Layer
             var activationDerivative = lastInputM.Map(_activationDerivative);
             return Matrix.Hadamard(gradM, activationDerivative);
         }
-        if (_lastInput is SimpleTensor lastInputT && outputGradient is SimpleTensor gradT)
+        if (_lastInput is Tensor lastInputT && outputGradient is Tensor gradT)
         {
             var result = lastInputT.Map(_activationDerivative);
-            SimpleTensor.Hadamard(gradT, result, result);
+            Tensor.Hadamard(gradT, result, result);
             return result;
         }
         throw new ArgumentException("Unsupported input type for ActivationLayer backward pass");

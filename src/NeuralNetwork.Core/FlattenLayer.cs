@@ -15,7 +15,7 @@ public class FlattenLayer : Layer
     /// <inheritdoc/>
     public override object Forward(object input)
     {
-        if (input is SimpleTensor t)
+        if (input is Tensor t)
         {
             _lastInputWidth = t.Width;
             _lastInputHeight = t.Height;
@@ -30,7 +30,7 @@ public class FlattenLayer : Layer
     {
         if (outputGradient is Matrix m)
         {
-            return SimpleTensor.FromMatrix(m, _lastInputWidth, _lastInputHeight, _lastInputDepth);
+            return Tensor.FromMatrix(m, _lastInputWidth, _lastInputHeight, _lastInputDepth);
         }
         throw new ArgumentException("FlattenLayer backward pass only accepts Matrices.");
     }

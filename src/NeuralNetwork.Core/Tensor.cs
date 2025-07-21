@@ -10,18 +10,16 @@ using System.Runtime.CompilerServices;
 namespace NeuralNetwork;
 
 /// <summary>
-/// Представляет 3D-тензор, использующий неуправляемую выровненную память для высокой производительности.
-/// КРИТИЧЕСКИ ВАЖНО: Объекты этого класса ДОЛЖНЫ быть освобождены через Dispose() или блок using,
-/// чтобы избежать утечек нативной памяти.
+/// Представляет 3D-тензор
 /// </summary>
 [DebuggerDisplay("(w:{Width}, h:{Height}, d:{Depth}), size:{Size}")]
-public sealed unsafe class SimpleTensor : IDisposable
+public sealed unsafe class Tensor : IDisposable
 {
     // Сделан internal для эффективного взаимодействия с другими unsafe классами (Matrix).
     internal readonly float[] _data = null!;
     private bool _disposed;
 
-    public SimpleTensor(int width, int height, int depth)
+    public Tensor(int width, int height, int depth)
     {
         if (width <= 0 || height <= 0 || depth <= 0)
         {
@@ -48,6 +46,7 @@ public sealed unsafe class SimpleTensor : IDisposable
             return _data.AsSpan((h * Width + w) * Depth, Depth);
         }
     }
+
     /// <summary>
     /// Индексатор для доступа к элементам тензора. В debug-сборке выполняет проверку границ.
     /// Память организована в формате HWC (Height-Width-Channel).
@@ -72,6 +71,7 @@ public sealed unsafe class SimpleTensor : IDisposable
             GetWindow(x, y, sizex, sizey, dstPtr);
         }
     }
+
     /// <summary>
     /// Copies tensor window to one dimensional array
     /// </summary>
@@ -152,6 +152,10 @@ public sealed unsafe class SimpleTensor : IDisposable
         return Matrix.CreateVector(AsSpan());
     }
 
+    /// <summary>
+    /// Returns span to inner array
+    /// </summary>
+    /// <returns></returns>
     public Span<float> AsSpan()
     {
         return new Span<float>(_data, 0, Size);
@@ -160,14 +164,14 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// <summary>
     /// Создает тензор из плоской матрицы-вектора. Не копирует данные, а создает новый тензор.
     /// </summary>
-    public static SimpleTensor FromMatrix(Matrix matrix, int width, int height, int depth)
+    public static Tensor FromMatrix(Matrix matrix, int width, int height, int depth)
     {
         if (matrix.Rows * matrix.Cols != width * height * depth)
         {
             throw new ArgumentException("Matrix size does not match target tensor dimensions.");
         }
 
-        var tensor = new SimpleTensor(width, height, depth);
+        var tensor = new Tensor(width, height, depth);
         if (matrix.Stride == 1)
         {
             matrix.AsSpan().CopyTo(tensor.AsSpan());
@@ -203,9 +207,9 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// Эта операция не векторизована, т.к. Func<T, T> не может быть транслирован в SIMD.
     /// Для стандартных операций (ReLU) следует писать отдельные векторизованные методы.
     /// </summary>
-    public SimpleTensor Map(Action<ReadOnlySpan<float>, Span<float>> func)
+    public Tensor Map(Action<ReadOnlySpan<float>, Span<float>> func)
     {
-        var c = new SimpleTensor(Width, Height, Depth);
+        var c = new Tensor(Width, Height, Depth);
         func(_data, c._data);
         return c;
     }
@@ -214,15 +218,15 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// Выполняет поэлементное умножение (произведение Адамара) двух тензоров.
     /// Оптимизировано с использованием AVX.
     /// </summary>
-    public static SimpleTensor Hadamard(SimpleTensor a, SimpleTensor b)
+    public static Tensor Hadamard(Tensor a, Tensor b)
     {
         Debug.Assert(a.Width == b.Width && a.Height == b.Height && a.Depth == b.Depth);
-        var c = new SimpleTensor(a.Width, a.Height, a.Depth);
+        var c = new Tensor(a.Width, a.Height, a.Depth);
         Hadamard(a, b, c);
         return c;
     }
 
-    public static void Hadamard(SimpleTensor a, SimpleTensor b, SimpleTensor c)
+    public static void Hadamard(Tensor a, Tensor b, Tensor c)
     {
         Debug.Assert(a.Width == b.Width && a.Height == b.Height && a.Depth == b.Depth);
         Debug.Assert(a.Width == c.Width && a.Height == c.Height && a.Depth == c.Depth);
