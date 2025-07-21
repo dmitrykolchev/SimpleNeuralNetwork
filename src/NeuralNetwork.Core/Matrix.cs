@@ -87,7 +87,7 @@ public unsafe class Matrix : IDisposable
         return c;
     }
 
-    public static Matrix CreateRandom(int rows, int cols, Func<float> nextSingle)
+    public static Matrix CreateRandom(int rows, int cols, Func<int, int, float> nextSingle)
     {
         Debug.Assert(rows > 0 && cols > 0);
         var c = new Matrix(rows, cols);

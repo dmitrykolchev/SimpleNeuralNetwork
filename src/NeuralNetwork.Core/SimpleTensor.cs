@@ -61,6 +61,49 @@ public sealed unsafe class SimpleTensor : IDisposable
             return ref _data[(h * Width + w) * Depth + d];
         }
     }
+    internal void GetWindow(int x, int y, int sizex, int sizey, Span<float> dst)
+    {
+        Debug.Assert(sizex > 0 && sizey > 0);
+        Debug.Assert(sizex * sizey * Depth == dst.Length);
+        fixed (float* dstPtr = dst)
+        {
+            GetWindow(x, y, sizex, sizey, dstPtr);
+        }
+    }
+    /// <summary>
+    /// Copies tensor window to one dimensional array
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <param name="sizex"></param>
+    /// <param name="sizey"></param>
+    /// <param name="dst"></param>
+    internal unsafe void GetWindow(int x, int y, int sizex, int sizey, float* dst)
+    {
+        Debug.Assert(sizex > 0 && sizey > 0);
+        fixed (float* ptrSrc = _data)
+        {
+            for (int iy = y, i = 0; iy < y + sizey; ++iy)
+            {
+                var offsety = iy * Width;
+                for (var ix = x; ix < x + sizex; ++ix)
+                {
+                    var offsetx = (offsety + ix) * Depth;
+                    for (var iz = 0; iz < Depth; ++iz, ++i)
+                    {
+                        if (ix < 0 || iy < 0 || ix >= Width || iy >= Height)
+                        {
+                            dst[i] = 0f;
+                        }
+                        else
+                        {
+                            dst[i] = ptrSrc[offsetx + iz];
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Преобразует тензор в плоскую матрицу-вектор. Не копирует данные, а создает новую матрицу.
