@@ -317,18 +317,18 @@ public unsafe class Matrix : IDisposable
 
     public void Randomize()
     {
-        Randomize((_, _) => Random.Shared.NextSingle());
+        var scale = MathF.Sqrt(1.0f / Rows);
+        Randomize((_, _) => (Random.Shared.NextSingle() * 2f - 1f) * scale);
     }
 
     public void Randomize(Func<int, int, float> nextSingle)
     {
-        var scale = MathF.Sqrt(1.0f / Rows);
         for (int row = 0, rows = Rows; row < rows; row++)
         {
             var rowData = GetRow(row);
             for (int col = 0, cols = Cols; col < cols; col++)
             {
-                rowData[col] = (nextSingle(row, col) * 2f - 1f) * scale;
+                rowData[col] = nextSingle(row, col);
             }
         }
     }

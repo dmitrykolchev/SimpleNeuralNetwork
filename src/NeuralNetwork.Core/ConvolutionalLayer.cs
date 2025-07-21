@@ -30,7 +30,7 @@ public sealed unsafe class ConvolutionalLayer : Layer
     private readonly PaddingType _paddingType;
     private readonly int _padding; // Рассчитанное значение паддинга
 
-    private List<SimpleTensor> _filterGradients = null!;
+    private Matrix _filterGradients = null!;
     private float[] _biasGradients = null!;
     private SimpleTensor _lastInput = null!;
 
@@ -57,19 +57,17 @@ public sealed unsafe class ConvolutionalLayer : Layer
             _padding = 0;
         }
 
-        Filters = [];
-        Biases = new float[filterCount];
-
-        for (var i = 0; i < filterCount; i++)
+        var fanIn = filterSize * filterSize * inputDepth;
+        var scale = MathF.Sqrt(1.0f / fanIn);
+        Filters = Matrix.CreateRandom(filterCount, fanIn, (_, _) =>
         {
-            var filter = new SimpleTensor(filterSize, filterSize, inputDepth);
-            filter.Randomize(fanIn: filterSize * filterSize * inputDepth);
-            Filters.Add(filter);
-            Biases[i] = 0; // Инициализация смещений нулями - частая практика
-        }
+            return (Random.Shared.NextSingle() * 2f - 1f) * scale;
+        });
+        // Инициализация смещений нулями - частая практика
+        Biases = new float[filterCount];
     }
 
-    public List<SimpleTensor> Filters { get; private set; }
+    public Matrix Filters { get; private set; }
 
     public float[] Biases { get; private set; }
 
@@ -86,7 +84,7 @@ public sealed unsafe class ConvolutionalLayer : Layer
         //for (var f = 0; f < _filterCount; f++) // Для каждого фильтра
         Parallel.For(0, _filterCount, f =>
         {
-            var filterData = Filters[f]._data;
+            var filterData = Filters.GetRow(f);
             for (var y_out = 0; y_out < outputHeight; y_out++)
             {
                 var y_out1 = y_out * _stride - _padding;
@@ -109,7 +107,7 @@ public sealed unsafe class ConvolutionalLayer : Layer
                             {
                                 var lastInput = _lastInput[inputX, inputY];
                                 var depth = _lastInput.Depth;
-                                var filter = filterData.AsSpan((fy * _filterSize + fx) * depth, depth);
+                                var filter = filterData.Slice((fy * _filterSize + fx) * depth, depth);
                                 // Итерация по глубине (каналам)
                                 if (depth < 4)
                                 {
@@ -140,19 +138,14 @@ public sealed unsafe class ConvolutionalLayer : Layer
         var outputGradient = (SimpleTensor)outputGradientObj;
         var inputGradient = new SimpleTensor(_lastInput.Width, _lastInput.Height, _lastInput.Depth);
 
-        _filterGradients = [];
-        for (var i = 0; i < _filterCount; i++)
-        {
-            var gradTensor = new SimpleTensor(_filterSize, _filterSize, _lastInput.Depth);
-            _filterGradients.Add(gradTensor);
-        }
+        _filterGradients = Matrix.CreateZeros(_filterCount, _filterSize * _filterSize * _lastInput.Depth);
         _biasGradients = new float[_filterCount];
 
         //for (var f = 0; f < _filterCount; f++)
         Parallel.For(0, _filterCount, f =>
         {
-            var filterData = Filters[f]._data;
-            var filterGradData = _filterGradients[f]._data;
+            var filterData = Filters.GetRow(f);
+            var filterGradData = _filterGradients.GetRow(f);
 
             for (var y_out = 0; y_out < outputGradient.Height; y_out++)
             {
@@ -191,9 +184,9 @@ public sealed unsafe class ConvolutionalLayer : Layer
                                 }
                                 else
                                 {
-                                    var dst = filterGradData.AsSpan(dataIndex, depth);
+                                    var dst = filterGradData.Slice(dataIndex, depth);
                                     TensorPrimitives.MultiplyAdd(lastInput, grad, dst, dst);
-                                    var src = filterData.AsSpan(dataIndex, depth);
+                                    var src = filterData.Slice(dataIndex, depth);
                                     TensorPrimitives.MultiplyAdd(src, grad, input, input);
                                 }
                             }
@@ -205,15 +198,13 @@ public sealed unsafe class ConvolutionalLayer : Layer
         return inputGradient;
     }
 
-    public override void UpdateParameters(float learningRate)
+    public override void UpdateParameters(float lr)
     {
-        var lr = (float)learningRate;
         for (var f = 0; f < _filterCount; f++)
         {
             // Обновляем веса фильтров
-            var filterData = Filters[f]._data;
-            var filterGradData = _filterGradients[f]._data;
-            var size = Filters[f].Size;
+            var filterData = Filters.GetRow(f);
+            var filterGradData = _filterGradients.GetRow(f);
             TensorPrimitives.MultiplyAdd(filterGradData, -lr, filterData, filterData);
         }
         // Обновляем смещения
