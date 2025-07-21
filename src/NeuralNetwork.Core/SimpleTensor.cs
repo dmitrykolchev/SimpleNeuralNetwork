@@ -112,6 +112,15 @@ public sealed unsafe class SimpleTensor : IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal unsafe void SetWindow(int x, int y, int sizex, int sizey, ReadOnlySpan<float> src)
+    {
+        fixed (float* ptrSrc = src)
+        {
+            SetWindow(x, y, sizex, sizey, ptrSrc);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal unsafe void SetWindow(int x, int y, int sizex, int sizey, float* src)
     {
         Debug.Assert(sizex > 0 && sizey > 0);

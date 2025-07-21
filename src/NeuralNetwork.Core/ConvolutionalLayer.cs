@@ -131,10 +131,13 @@ public sealed unsafe class ConvolutionalLayer : Layer
                 {
                     var grad = outputGradient[x_out, y_out, f];
                     _biasGradients[f] += grad;
-                    _lastInput.GetWindow(x_out1, y_out1, _filterSize, _filterSize, lastInput);
-                    inputGradient.GetWindow(x_out1, y_out1, _filterSize, _filterSize, input);
+
+                    _lastInput.GetWindow(x_out1, y_out1, _filterSize, _filterSize, lastInputSpan);
                     TensorPrimitives.MultiplyAdd(lastInputSpan, grad, filterGradData, filterGradData);
+
+                    inputGradient.GetWindow(x_out1, y_out1, _filterSize, _filterSize, inputSpan);
                     TensorPrimitives.MultiplyAdd(filterData, grad, inputSpan, inputSpan);
+
                     inputGradient.SetWindow(x_out1, y_out1, _filterSize, _filterSize, input);
                 }
             }
