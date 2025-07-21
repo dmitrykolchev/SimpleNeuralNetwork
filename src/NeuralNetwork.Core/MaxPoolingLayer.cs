@@ -1,7 +1,9 @@
-﻿// <copyright file="MaxPoolingLayer.cs" company="Dmitry Kolchev">
+// <copyright file="MaxPoolingLayer.cs" company="Dmitry Kolchev">
 // Copyright (c) 2025 Dmitry Kolchev. All rights reserved.
 // See LICENSE in the project root for license information
 // </copyright>
+
+using System.Diagnostics;
 
 namespace NeuralNetwork;
 
@@ -53,6 +55,7 @@ public class MaxPoolingLayer : Layer
                             }
                         }
                     }
+                    Debug.Assert(maxIndexX >= 0 && maxIndexY >= 0);
                     output[x, y, d] = maxVal;
                     // Сохраняем одномерный индекс для простоты
                     _maxIndices[x, y, d] = maxIndexY * _lastInput.Width + maxIndexX;

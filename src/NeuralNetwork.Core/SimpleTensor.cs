@@ -83,19 +83,22 @@ public sealed unsafe class SimpleTensor : IDisposable
         Debug.Assert(sizex > 0 && sizey > 0);
         fixed (float* ptrSrc = _data)
         {
-            for (int iy = y, i = 0; iy < y + sizey; ++iy)
+            for (int iy = y, ycount = y + sizey, i = 0; iy < ycount; ++iy)
             {
                 var offsety = iy * Width;
-                for (var ix = x; ix < x + sizex; ++ix)
+                for (int ix = x, xcount = x + sizex; ix < xcount; ++ix)
                 {
                     var offsetx = (offsety + ix) * Depth;
-                    for (var iz = 0; iz < Depth; ++iz, ++i)
+                    if (ix < 0 || iy < 0 || ix >= Width || iy >= Height)
                     {
-                        if (ix < 0 || iy < 0 || ix >= Width || iy >= Height)
+                        for (var iz = 0; iz < Depth; ++iz, ++i)
                         {
                             dst[i] = 0f;
                         }
-                        else
+                    }
+                    else
+                    {
+                        for (var iz = 0; iz < Depth; ++iz, ++i)
                         {
                             dst[i] = ptrSrc[offsetx + iz];
                         }
