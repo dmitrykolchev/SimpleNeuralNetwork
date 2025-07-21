@@ -4,6 +4,7 @@
 // </copyright>
 
 using System.Numerics.Tensors;
+using System.Runtime.InteropServices;
 
 namespace NeuralNetwork;
 
@@ -85,50 +86,19 @@ public sealed unsafe class ConvolutionalLayer : Layer
         Parallel.For(0, _filterCount, f =>
         {
             var filterData = Filters.GetRow(f);
-            for (var y_out = 0; y_out < outputHeight; y_out++)
+            var windowData = (float*)NativeMemory.AlignedAlloc((nuint)filterData.Length * sizeof(float), 32);
+            var windowDataSpan = new ReadOnlySpan<float>(windowData, filterData.Length);
+
+            for (int y_out = 0, y_out1 = -_padding; y_out < outputHeight; y_out++, y_out1 += _stride)
             {
-                var y_out1 = y_out * _stride - _padding;
-                for (var x_out = 0; x_out < outputWidth; x_out++)
+                for (int x_out = 0, x_out1 = -_padding; x_out < outputWidth; x_out++, x_out1 += _stride)
                 {
-                    var x_out1 = x_out * _stride - _padding;
-                    var sum = 0f;
-                    // Итерация по окну свертки
-                    for (var fy = 0; fy < _filterSize; fy++)
-                    {
-                        var inputY = y_out1 + fy;
-
-                        for (var fx = 0; fx < _filterSize; fx++)
-                        {
-                            // Рассчитываем координаты в исходном тензоре
-                            var inputX = x_out1 + fx;
-
-                            // Логический паддинг: проверяем, находимся ли мы в границах исходного изображения
-                            if (inputY >= 0 && inputY < _lastInput.Height && inputX >= 0 && inputX < _lastInput.Width)
-                            {
-                                var lastInput = _lastInput[inputX, inputY];
-                                var depth = _lastInput.Depth;
-                                var filter = filterData.Slice((fy * _filterSize + fx) * depth, depth);
-                                // Итерация по глубине (каналам)
-                                if (depth < 4)
-                                {
-                                    for (var d = 0; d < depth; d++)
-                                    {
-                                        var inputValue = lastInput[d];
-                                        var filterValue = filter[d];
-                                        sum += inputValue * filterValue;
-                                    }
-                                }
-                                else
-                                {
-                                    sum += TensorPrimitives.Dot(lastInput, filter);
-                                }
-                            }
-                            // Если мы за границами, ничего не добавляем (эквивалентно умножению на 0)
-                        }
-                    }
+                    _lastInput.GetWindow(x_out1, y_out1, _filterSize, _filterSize, windowData);
+                    var sum = TensorPrimitives.Dot(windowDataSpan, filterData);
                     output[x_out, y_out, f] = sum + Biases[f];
                 }
             }
+            NativeMemory.AlignedFree(windowData);
         });
         return output;
     }
@@ -147,53 +117,30 @@ public sealed unsafe class ConvolutionalLayer : Layer
             var filterData = Filters.GetRow(f);
             var filterGradData = _filterGradients.GetRow(f);
 
-            for (var y_out = 0; y_out < outputGradient.Height; y_out++)
-            {
-                var y_out1 = y_out * _stride - _padding;
+            var size = _filterSize * _filterSize * _lastInput.Depth;
 
-                for (var x_out = 0; x_out < outputGradient.Width; x_out++)
+            var lastInput = (float*)NativeMemory.AlignedAlloc((nuint)size * sizeof(float), 32);
+            var lastInputSpan = new Span<float>(lastInput, size);
+
+            var input = (float*)NativeMemory.AlignedAlloc((nuint)size * sizeof(float), 32);
+            var inputSpan = new Span<float>(input, size);
+            inputSpan.Clear();
+            for (int y_out = 0, y_out1 = -_padding; y_out < outputGradient.Height; y_out++, y_out1 += _stride)
+            {
+                for (int x_out = 0, x_out1 = -_padding; x_out < outputGradient.Width; x_out++, x_out1 += _stride)
                 {
                     var grad = outputGradient[x_out, y_out, f];
                     _biasGradients[f] += grad;
-
-                    var x_out1 = x_out * _stride - _padding;
-
-                    for (var fy = 0; fy < _filterSize; fy++)
-                    {
-                        var inputY = y_out1 + fy;
-
-                        for (var fx = 0; fx < _filterSize; fx++)
-                        {
-                            var inputX = x_out1 + fx;
-
-                            if (inputY >= 0 && inputY < _lastInput.Height && inputX >= 0 && inputX < _lastInput.Width)
-                            {
-                                var lastInput = _lastInput[inputX, inputY];
-                                var input = inputGradient[inputX, inputY];
-                                var dataIndex = (fy * _filterSize + fx) * _lastInput.Depth;
-                                var depth = _lastInput.Depth;
-                                if (depth < 4)
-                                {
-                                    for (var d = 0; d < depth; d++)
-                                    {
-                                        // Обновляем градиент для фильтра
-                                        filterGradData[dataIndex + d] += lastInput[d] * grad;
-                                        // Обновляем градиент для входа
-                                        input[d] += filterData[dataIndex + d] * grad;
-                                    }
-                                }
-                                else
-                                {
-                                    var dst = filterGradData.Slice(dataIndex, depth);
-                                    TensorPrimitives.MultiplyAdd(lastInput, grad, dst, dst);
-                                    var src = filterData.Slice(dataIndex, depth);
-                                    TensorPrimitives.MultiplyAdd(src, grad, input, input);
-                                }
-                            }
-                        }
-                    }
+                    _lastInput.GetWindow(x_out1, y_out1, _filterSize, _filterSize, lastInput);
+                    inputGradient.GetWindow(x_out1, y_out1, _filterSize, _filterSize, input);
+                    TensorPrimitives.MultiplyAdd(lastInputSpan, grad, filterGradData, filterGradData);
+                    TensorPrimitives.MultiplyAdd(filterData, grad, inputSpan, inputSpan);
+                    inputGradient.SetWindow(x_out1, y_out1, _filterSize, _filterSize, input);
                 }
             }
+
+            NativeMemory.AlignedFree(lastInput);
+            NativeMemory.AlignedFree(input);
         });
         return inputGradient;
     }

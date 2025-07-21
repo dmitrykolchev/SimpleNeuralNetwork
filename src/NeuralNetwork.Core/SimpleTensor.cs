@@ -61,6 +61,8 @@ public sealed unsafe class SimpleTensor : IDisposable
             return ref _data[(h * Width + w) * Depth + d];
         }
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void GetWindow(int x, int y, int sizex, int sizey, Span<float> dst)
     {
         Debug.Assert(sizex > 0 && sizey > 0);
@@ -78,6 +80,7 @@ public sealed unsafe class SimpleTensor : IDisposable
     /// <param name="sizex"></param>
     /// <param name="sizey"></param>
     /// <param name="dst"></param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal unsafe void GetWindow(int x, int y, int sizex, int sizey, float* dst)
     {
         Debug.Assert(sizex > 0 && sizey > 0);
@@ -86,7 +89,7 @@ public sealed unsafe class SimpleTensor : IDisposable
             for (int iy = y, ycount = y + sizey, i = 0; iy < ycount; ++iy)
             {
                 var offsety = iy * Width;
-                for (int ix = x, xcount = x + sizex; ix < xcount; ++ix)
+                for (int ix = x, xcount = x + sizex; ix < xcount; ++ix) //, i += Depth)
                 {
                     var offsetx = (offsety + ix) * Depth;
                     if (ix < 0 || iy < 0 || ix >= Width || iy >= Height)
@@ -101,6 +104,30 @@ public sealed unsafe class SimpleTensor : IDisposable
                         for (var iz = 0; iz < Depth; ++iz, ++i)
                         {
                             dst[i] = ptrSrc[offsetx + iz];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal unsafe void SetWindow(int x, int y, int sizex, int sizey, float* src)
+    {
+        Debug.Assert(sizex > 0 && sizey > 0);
+        fixed (float* ptrDst = _data)
+        {
+            for (int iy = y, ycount = y + sizey, i = 0; iy < ycount; ++iy)
+            {
+                var offsety = iy * Width;
+                for (int ix = x, xcount = x + sizex; ix < xcount; ++ix)
+                {
+                    var offsetx = (offsety + ix) * Depth;
+                    if (ix >= 0 && iy >= 0 && ix < Width && iy < Height)
+                    {
+                        for (var iz = 0; iz < Depth; ++iz, ++i)
+                        {
+                            ptrDst[offsetx + iz] = src[i];
                         }
                     }
                 }
