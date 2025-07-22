@@ -61,6 +61,15 @@ public sealed unsafe class Tensor : IDisposable
         }
     }
 
+    public ref float this[int index]
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
+        {
+            return ref _data[index];
+        }
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void GetWindow(int x, int y, int sizex, int sizey, Span<float> dst)
     {

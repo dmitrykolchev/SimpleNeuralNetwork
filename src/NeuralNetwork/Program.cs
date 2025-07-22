@@ -18,13 +18,17 @@ internal static class Program
         var done = false;
         while (!done)
         {
-            Console.Write(">");
+            Console.Write("CNN>");
             try
             {
                 var commandText = Console.ReadLine();
                 var command = CommandInfo.Parse(commandText);
                 switch (command.Command)
                 {
+                    case CommandType.Clear:
+                        Console.Clear();
+                        Console.WriteLine("Press 'h' for help");
+                        break;
                     case CommandType.Help:
                         PrintHelp();
                         break;
@@ -248,6 +252,7 @@ internal static class Program
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine("-----------------------------------------------");
         Console.WriteLine(" H                  - Print [H]elp information");
+        Console.WriteLine(" C                  - [C]lear screen");
         Console.WriteLine(" P [ImageIndex]     - [P]rint image");
         Console.WriteLine(" R [ImageIndex]     - [R]ecognize image");
         Console.WriteLine(" T [NumberOfImages] - [T]rain neural network");

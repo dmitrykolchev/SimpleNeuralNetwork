@@ -10,19 +10,20 @@ public enum CommandType
     None,
     Invalid,
     Help,
+    Clear,
     PrintImage,
     RecognizeImage,
     TrainNetwork,
     SaveNetwork,
     LoadNetwork,
     Quit,
-
 }
 
 public class CommandInfo
 {
     private static readonly CommandInfo None = new() { Command = CommandType.None };
     private static readonly CommandInfo Quit = new() { Command = CommandType.Quit };
+    private static readonly CommandInfo Clear = new() { Command = CommandType.Clear };
     private static readonly CommandInfo Help = new() { Command = CommandType.Help };
     private static readonly CommandInfo Invalid = new() { Command = CommandType.Invalid };
 
@@ -41,6 +42,8 @@ public class CommandInfo
         {
             switch (command[0].ToUpper())
             {
+                case "C":
+                    return Clear;
                 case "Q":
                     return Quit;
                 case "H":
