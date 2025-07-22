@@ -174,6 +174,7 @@ public unsafe class Matrix : IDisposable
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Matrix Subtract(Matrix a, Matrix b)
     {
         Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
@@ -182,15 +183,26 @@ public unsafe class Matrix : IDisposable
         return c;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SubtractI(Matrix a, Matrix b)
     {
         Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
         Subtract(a, b, a);
     }
 
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Matrix Multiply(Matrix a, float alpha)
     {
         var c = new Matrix(rows: a.Rows, cols: a.Cols);
+        Multiply(a, alpha, c);
+        return c;
+    }
+
+    public static void Multiply(Matrix a, float alpha, Matrix c)
+    {
+        Debug.Assert(a.Rows == c.Rows && a.Cols == c.Cols);
+
         if (a.Stride == 1 && c.Stride == 1)
         {
             TensorPrimitives.Multiply(a.AsSpan(), alpha, c.AsSpan());
@@ -204,7 +216,6 @@ public unsafe class Matrix : IDisposable
                 TensorPrimitives.Multiply(rowA, alpha, rowC);
             }
         }
-        return c;
     }
 
     public static Matrix Multiply(Matrix a, bool transposeA, Matrix b, bool transposeB)
