@@ -10,6 +10,7 @@ internal static class Program
     private static List<(Matrix, Matrix)> _trainingData = null!;
     private static List<(Matrix, Matrix)> _testData = null!;
     private static NeuralNetwork _network = null!;
+    private static float _learningRate = 0.01f;
 
     static void Main()
     {
@@ -31,6 +32,10 @@ internal static class Program
                         break;
                     case CommandType.Help:
                         PrintHelp();
+                        break;
+                    case CommandType.SetLearningRate:
+                        _learningRate = MathF.Min(1, MathF.Max(0, (float)command.Arguments[0]));
+                        Console.WriteLine($"Learning rate: {_learningRate}");
                         break;
                     case CommandType.PrintImage:
                         if (_network == null)
@@ -120,11 +125,11 @@ internal static class Program
 
         if (args?.Count == 1)
         {
-            network.Train(cnnTrainingData.Take((int)args[0]).ToList(), epochs: 5, learningRate: 0.03f);
+            network.Train(cnnTrainingData.Take((int)args[0]).ToList(), epochs: 5, learningRate: _learningRate);
         }
         else
         {
-            network.Train(cnnTrainingData, epochs: 5, learningRate: 0.03f);
+            network.Train(cnnTrainingData, epochs: 5, learningRate: _learningRate);
         }
 
         Console.WriteLine("Training complete.");
@@ -150,7 +155,7 @@ internal static class Program
         return network;
     }
 
-    private static void SaveNetwork(NeuralNetwork network)
+    private static void SaveNetwork(NeuralNetwork _)
     {
         Console.WriteLine("saving isn't implemented");
     }
@@ -185,7 +190,10 @@ internal static class Program
         }
         else
         {
+            var color = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"Predicted value: {predictedValue} (invalid)");
+            Console.ForegroundColor = color;
         }
     }
 
@@ -212,10 +220,8 @@ internal static class Program
         return -1;
     }
 
-    private static void PrintImage(int imageIndex)
+    private static void PrintImage(Matrix image)
     {
-        (Matrix image, Matrix label) item = _testData[imageIndex];
-        Console.WriteLine($"Label: {item.label.GetMaxIndex().row}");
         Console.WriteLine("+--------------------------------------------------------+");
         for (var y = 0; y < 28; y++)
         {
@@ -223,7 +229,7 @@ internal static class Program
             for (var x = 0; x < 28; x++)
             {
                 var offset = y * 28 + x;
-                var pixel = item.image[offset, 0];
+                var pixel = image[offset, 0];
                 if (pixel > 0.75f)
                 {
                     Console.Write("@@");
@@ -246,6 +252,13 @@ internal static class Program
         Console.WriteLine("+--------------------------------------------------------+");
     }
 
+    private static void PrintImage(int imageIndex)
+    {
+        var (image, label) = _testData[imageIndex];
+        Console.WriteLine($"Label: {label.GetMaxIndex().row}");
+        PrintImage(image);
+    }
+
     private static void PrintHelp()
     {
         var color = Console.ForegroundColor;
@@ -258,6 +271,7 @@ internal static class Program
         Console.WriteLine(" T [NumberOfImages] - [T]rain neural network");
         Console.WriteLine(" S [Filename]       - [S]ave NN parameters");
         Console.WriteLine(" L [FileName]       - [L]oad NN parameters");
+        Console.WriteLine(" LR [0.01]          - Set [L]earning [R]ate");
         Console.WriteLine("-----------------------------------------------");
         Console.WriteLine(" Q                  - [Q]uit");
         Console.WriteLine("-----------------------------------------------");

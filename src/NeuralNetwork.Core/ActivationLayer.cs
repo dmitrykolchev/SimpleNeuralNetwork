@@ -40,14 +40,15 @@ public class ActivationLayer : Layer
     {
         if (_lastInput is Matrix lastInputM && outputGradient is Matrix gradM)
         {
-            var activationDerivative = lastInputM.Map(_activationDerivative);
-            return Matrix.Hadamard(gradM, activationDerivative);
+            var temp = lastInputM.Map(_activationDerivative);
+            Matrix.Hadamard(gradM, temp, temp);
+            return temp;
         }
         if (_lastInput is Tensor lastInputT && outputGradient is Tensor gradT)
         {
-            var result = lastInputT.Map(_activationDerivative);
-            Tensor.Hadamard(gradT, result, result);
-            return result;
+            var temp = lastInputT.Map(_activationDerivative);
+            Tensor.Hadamard(gradT, temp, temp);
+            return temp;
         }
         throw new ArgumentException("Unsupported input type for ActivationLayer backward pass");
     }

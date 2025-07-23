@@ -11,6 +11,7 @@ public enum CommandType
     Invalid,
     Help,
     Clear,
+    SetLearningRate,
     PrintImage,
     RecognizeImage,
     TrainNetwork,
@@ -48,6 +49,15 @@ public class CommandInfo
                     return Quit;
                 case "H":
                     return Help;
+                case "LR":
+                    if(command.Length == 2)
+                    {
+                        if(float.TryParse(command[1], out var value))
+                        {
+                            return new CommandInfo { Command = CommandType.SetLearningRate, Arguments = [value] };
+                        }
+                    }
+                    return Invalid;
                 case "P":
                     if (command.Length == 1)
                     {

@@ -282,11 +282,21 @@ public unsafe class Matrix : IDisposable
         return c;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Matrix Hadamard(Matrix a, Matrix b)
     {
         Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
-
         var c = new Matrix(a.Rows, a.Cols);
+        Hadamard(a, b, c);
+        return c;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Hadamard(Matrix a, Matrix b, Matrix c)
+    {
+        Debug.Assert(a.Rows == b.Rows && a.Cols == b.Cols);
+        Debug.Assert(a.Rows == c.Rows && a.Cols == c.Cols);
+
         if (a.Stride == 1 && b.Stride == 1)
         {
             TensorPrimitives.Multiply(a.AsSpan(), b.AsSpan(), c.AsSpan());
@@ -301,7 +311,6 @@ public unsafe class Matrix : IDisposable
                 TensorPrimitives.Multiply(rowA, rowB, rowC);
             }
         }
-        return c;
     }
 
     public static Matrix Transpose(Matrix a)
@@ -313,7 +322,7 @@ public unsafe class Matrix : IDisposable
         }
         else
         {
-            var cSpan = c.AsSpan();
+            var cSpan = c._data;
             for (var row = 0; row < a.Rows; row++)
             {
                 var rowData = a.GetRow(row);
