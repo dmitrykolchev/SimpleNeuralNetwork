@@ -34,7 +34,7 @@ internal static class Program
                         PrintHelp();
                         break;
                     case CommandType.SetLearningRate:
-                        _learningRate = MathF.Min(1, MathF.Max(0, (float)command.Arguments[0]));
+                        _learningRate = MathF.Min(1, MathF.Max(0, (float)command.Arguments![0]));
                         Console.WriteLine($"Learning rate: {_learningRate}");
                         break;
                     case CommandType.PrintImage:

@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="intelmkl.redist.win-x64" Version="2025.2.0.627" />
-    <PackageReference Include="intelopenmp.redist.win" Version="2025.2.0.756" />
+    <PackageReference Include="intelopenmp.redist.win" Version="2025.2.1.1000" />
     <PackageReference Include="inteltbb.redist.win" Version="2022.2.0.503" />
   </ItemGroup>
 
