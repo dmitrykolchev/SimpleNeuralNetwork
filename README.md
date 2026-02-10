@@ -2,6 +2,8 @@
 
 This repository provides a demonstration of deep learning capabilities in pure C# without any frameworks. 
 
+<img width="2752" height="1536" alt="image" src="https://github.com/user-attachments/assets/0c0e8eb4-a608-4858-853e-567cd9987d92" />
+
 A convolutional neural network that classifies handwritten digits (0-9) using the MNIST dataset achieving near 99% accuracy.
 
 **Training Performance**
